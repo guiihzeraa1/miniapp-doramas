@@ -224,6 +224,9 @@
             const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série Teste';
             const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
             const epsComprimidos = params.get('eps');
+            
+            // 👇 ADICIONE ESTA LINHA AQUI:
+            const chatIdSerie = params.get('chat_id');
 
             const feedContainer = document.getElementById('feed');
             const epModal = document.getElementById('episodes-modal');
@@ -240,7 +243,8 @@
                         const id = partes[0];
                         const hash = partes[1];
                         playlist.push({
-                            url: `${serverBase}/stream/${id}?hash=${hash}`,
+                            // 👇 ADICIONE O &chat_id=${chatIdSerie} NO FINAL DA URL!
+                            url: `${serverBase}/stream/${id}?hash=${hash}&chat_id=${chatIdSerie}`,
                             titulo: `${tituloSerie} - Ep ${index + 1}`
                         });
                     }
