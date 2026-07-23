@@ -42,6 +42,9 @@
             margin: 0 auto;
             background: #000;
             overflow: hidden;
+            
+            /* Adicione isto: */
+            border-radius: 0 !important;
         }
 
         @media (min-width: 481px) {
@@ -76,14 +79,20 @@
             border-radius: 0 !important; /* Garante que o card seja 100% quadrado */
         }
 
-        video-player { display: contents; }
+        video-player { 
+            display: contents; 
+            /* Força o componente a não usar bordas arredondadas no Shadow DOM */
+            --media-border-radius: 0px !important;
+            --media-control-bar-border-radius: 0px !important;
+        }
+        
         video-skin { 
             display: block; 
             width: 100%; 
             height: 100%; 
             --media-object-fit: cover; 
+            --media-border-radius: 0px !important;
             
-            /* Remove a borda do componente do Video.js */
             border-radius: 0 !important; 
         }
 
