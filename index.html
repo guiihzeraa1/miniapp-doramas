@@ -128,7 +128,7 @@
         /* ─── BOTÃO EPISÓDIOS E POPUP ─── */
         .episodes-toggle {
             position: absolute;
-            bottom: 145px; /* Fica flutuando do lado direito, logo acima do título da série */
+            bottom: 145px;
             right: 16px;
             background: rgba(0, 0, 0, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.3);
@@ -215,7 +215,7 @@
                 tg.expand();
             } catch (e) {}
 
-            // O comando de tela cheia que você pediu
+            // O comando de tela cheia
             try {
                 tg.requestFullscreen();
             } catch (e) {}
@@ -226,8 +226,7 @@
             const epsComprimidos = params.get('eps');
             
             const chatIdSerie = params.get('chat_id');
-            // 👇 ADICIONE ESTA LINHA:
-            const accessHashSerie = params.get('access_hash') || "0";
+            const accessHashSerie = params.get('access_hash') || "0"; // Nova variável lida da URL
 
             const feedContainer = document.getElementById('feed');
             const epModal = document.getElementById('episodes-modal');
@@ -244,8 +243,8 @@
                         const id = partes[0];
                         const hash = partes[1];
                         playlist.push({
-                            // 👇 ADICIONE O &chat_id=${chatIdSerie} NO FINAL DA URL!
-                            url: `${serverBase}/stream/${id}?hash=${hash}&chat_id=${chatIdSerie}`,
+                            // 👇 URL corrigida para incluir o access_hash
+                            url: `${serverBase}/stream/${id}?hash=${hash}&chat_id=${chatIdSerie}&access_hash=${accessHashSerie}`,
                             titulo: `${tituloSerie} - Ep ${index + 1}`
                         });
                     }
