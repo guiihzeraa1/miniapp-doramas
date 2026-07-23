@@ -271,10 +271,9 @@
 
         const params = new URLSearchParams(window.location.search);
         
-        // ─── LEITURA DOS PARÂMETROS COMPACTADOS ───
         const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série Teste';
         const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
-        const epsComprimidos = params.get('eps'); // Ex: "76_622df7,77_abcdef"
+        const epsComprimidos = params.get('eps');
 
         const feedContainer = document.getElementById('feed');
         const epModal = document.getElementById('episodes-modal');
@@ -285,18 +284,14 @@
             epModal.classList.toggle('active');
         }
 
-        // ─── LÓGICA DE DADOS (DESCOMPACTADOR) ───
         if (epsComprimidos) {
             const listaEps = epsComprimidos.split(',');
             
             listaEps.forEach((epItem, index) => {
-                // Separa o ID do HASH que o Python juntou com o "_"
                 const partes = epItem.split('_');
                 if(partes.length === 2) {
                     const id = partes[0];
                     const hash = partes[1];
-                    
-                    // Remonta a URL completa mágica!
                     const urlCompleta = `${serverBase}/stream/${id}?hash=${hash}`;
 
                     playlist.push({
@@ -306,17 +301,10 @@
                     });
                 }
             });
-        } else {
-            // Fallback de teste local
-            playlist = [
-                { url: `${serverBase}/stream/7?hash=622df7`, titulo: "Teste - Ep 1", descricao: "Deslize para cima" },
-                { url: `${serverBase}/stream/6?hash=2f2ba9`, titulo: "Teste - Ep 2", descricao: "Fim" }
-            ];
         }
 
-        // ─── CONSTRUÇÃO DA TELA (SEU CÓDIGO INTACTO) ───
+        // ─── CONSTRUÇÃO DA TELA ───
         playlist.forEach((item, index) => {
-
             const btn = document.createElement('button');
             btn.className = 'ep-btn';
             btn.innerText = `${index + 1}`; 
@@ -329,11 +317,13 @@
             const card = document.createElement('div');
             card.className = 'video-card';
             card.id = `card-ep-${index}`; 
+            card.setAttribute('data-index', index); // Guardamos o índice para o cérebro saber onde estamos
 
             card.innerHTML = `
                 <video-player>
                     <video-skin>
-                        <video src="${item.url}" loop autoplay muted playsinline></video>
+                        <!-- Deixamos preload="auto" para que, assim que o JS colocar o link, ele já comece a baixar em segundo plano -->
+                        <video data-src="${item.url}" loop playsinline preload="auto"></video>
                         
                         <media-controls>
                             <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
@@ -350,25 +340,46 @@
             feedContainer.appendChild(card);
         });
 
-        // ─── OBSERVER (SEU CÓDIGO INTACTO) ───
+        // ─── CÉREBRO DE CARREGAMENTO INTELIGENTE (TIPO TIKTOK) ───
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
+                const cardIndex = parseInt(entry.target.getAttribute('data-index'));
                 const video = entry.target.querySelector('video');
                 if (!video) return;
 
                 if (entry.isIntersecting) {
+                    
+                    // 1. Liga e dá play no vídeo atual
+                    if (!video.src) {
+                        video.src = video.getAttribute('data-src');
+                    }
                     video.muted = true;
                     video.play().then(() => {
-                        video.unmuteTimeout = setTimeout(() => {
-                            video.muted = false;
-                        }, 1000);
+                        video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
                     }).catch(() => {
-                        console.log("Autoplay bloqueado pelo navegador.");
+                        console.log("Autoplay bloqueado.");
                     });
+
+                    // 2. PRÉ-CARREGAMENTO MÁGICO (Os próximos 2 vídeos)
+                    // Ele avisa o navegador: "Ei, comece a baixar o Ep 2 e o Ep 3 silenciosamente"
+                    for (let i = 1; i <= 2; i++) {
+                        const proximoIndex = cardIndex + i;
+                        if (proximoIndex < playlist.length) {
+                            const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
+                            if (proximoCard) {
+                                const proximoVideo = proximoCard.querySelector('video');
+                                // Injeta o link se ainda estiver vazio, fazendo o navegador baixar o Status 206 na surdina
+                                if (proximoVideo && !proximoVideo.src) {
+                                    proximoVideo.src = proximoVideo.getAttribute('data-src');
+                                }
+                            }
+                        }
+                    }
+
                 } else {
+                    // Quando o vídeo sai da tela, pausamos ele
                     clearTimeout(video.unmuteTimeout);
                     video.pause();
-                    video.currentTime = 0; 
                     video.muted = true;
                 }
             });
