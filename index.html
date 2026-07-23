@@ -209,7 +209,8 @@
             btn.innerText = `${index + 1}`; 
             btn.addEventListener('click', () => {
                 epModal.classList.remove('active');
-                document.getElementById(`card-ep-${index}`).scrollIntoView({ behavior: 'smooth' });
+                // TÉCNICA 1: Trocamos 'smooth' por 'auto'. Pulo imediato sem engasgar o servidor!
+                document.getElementById(`card-ep-${index}`).scrollIntoView({ behavior: 'auto' });
             });
             epGrid.appendChild(btn);
 
@@ -218,7 +219,6 @@
             card.id = `card-ep-${index}`; 
             card.setAttribute('data-index', index); 
 
-            // Removi a tag "info-desc" que estava órfã no seu HTML
             card.innerHTML = `
                 <video-player>
                     <video-skin>
@@ -235,7 +235,7 @@
             feedContainer.appendChild(card);
         });
 
-        // ─── OBSERVER OTIMIZADO ───
+        // ─── CÉREBRO OTIMIZADO DE FORÇA MÁXIMA ───
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 const cardIndex = parseInt(entry.target.getAttribute('data-index'));
@@ -243,33 +243,45 @@
                 if (!video) return;
 
                 if (entry.isIntersecting) {
-                    if (!video.src) {
-                        video.src = video.getAttribute('data-src');
-                    }
-                    video.muted = true;
-                    video.play().then(() => {
-                        video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
-                    }).catch(() => { console.log("Autoplay bloqueado."); });
+                    // TÉCNICA 2: O Temporizador (Debounce). Esperamos 400ms.
+                    // Se a pessoa rolar a tela antes de dar 400ms, a gente aborta tudo!
+                    video.loadTimer = setTimeout(() => {
+                        // 1. Só liga o vídeo se a pessoa realmente parou nele
+                        if (!video.src) {
+                            video.src = video.getAttribute('data-src');
+                        }
+                        video.muted = true;
+                        video.play().then(() => {
+                            video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
+                        }).catch(() => { console.log("Autoplay bloqueado."); });
 
-                    const proximoIndex = cardIndex + 1;
-                    if (proximoIndex < playlist.length) {
-                        const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
-                        if (proximoCard) {
-                            const proximoVideo = proximoCard.querySelector('video');
-                            if (proximoVideo && !proximoVideo.src) {
-                                proximoVideo.src = proximoVideo.getAttribute('data-src');
+                        // 2. O pré-carregamento foi movido pra dentro do timer!
+                        // Assim ele NUNCA vai pré-carregar vídeos que você só passou direto na rolagem
+                        const proximoIndex = cardIndex + 1;
+                        if (proximoIndex < playlist.length) {
+                            const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
+                            if (proximoCard) {
+                                const proximoVideo = proximoCard.querySelector('video');
+                                if (proximoVideo && !proximoVideo.src) {
+                                    proximoVideo.src = proximoVideo.getAttribute('data-src');
+                                }
                             }
                         }
-                    }
+                    }, 400); // 400 milissegundos de carência
 
                 } else {
+                    // SE SAIU DA TELA: Cortamos o temporizador na hora! Zero gasto de banda.
+                    clearTimeout(video.loadTimer);
                     clearTimeout(video.unmuteTimeout);
                     video.pause();
                     video.muted = true;
 
+                    // Faxina pesada: Mata qualquer conexão de quem ficou pra trás
                     if (Math.abs(cardIndex - getIndexVisivelAtual()) > 2) {
-                        video.removeAttribute('src'); 
-                        video.load(); 
+                        if (video.src) { // Só remove se já tiver link, pra poupar o navegador
+                            video.removeAttribute('src'); 
+                            video.load(); 
+                        }
                     }
                 }
             });
