@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mini App - Dramas (Autoplay com Som Atrasado)</title>
+    <title>Mini App - Dramas</title>
 
     <!-- Script Oficial do Telegram Mini Apps -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -58,7 +58,6 @@
             scroll-snap-type: y mandatory;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
-            
             scrollbar-width: none; 
             -ms-overflow-style: none; 
         }
@@ -76,37 +75,13 @@
             overflow: hidden;
         }
 
-        /* ─── CONFIGURAÇÃO DO PLAYER PADRÃO (VIDEO.JS) ─── */
-        video-player {
-            display: contents; 
-        }
+        video-player { display: contents; }
+        video-skin { display: block; width: 100%; height: 100%; --media-object-fit: cover; }
+        video { width: 100%; height: 100%; pointer-events: auto; }
+        media-controls { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.25s; }
+        media-controls:not([data-visible]) { opacity: 0; }
 
-        video-skin {
-            display: block;
-            width: 100%;
-            height: 100%;
-            --media-object-fit: cover; 
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-            pointer-events: auto; 
-        }
-
-        /* ─── TAG NATIVA DE CONTROLES (GERENCIA O AUTO-FADE) ─── */
-        media-controls {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            transition: opacity 0.25s;
-        }
-
-        media-controls:not([data-visible]) {
-            opacity: 0;
-        }
-
-        /* ─── INFORMAÇÕES DA SÉRIE (TÍTULO E DESCRIÇÃO) ─── */
+        /* ─── INFORMAÇÕES DA SÉRIE ─── */
         .info-overlay {
             position: absolute;
             bottom: 0; 
@@ -126,13 +101,7 @@
             overflow-wrap: anywhere;
         }
 
-        .info-desc {
-            font-size: clamp(0.85rem, 3vw, 0.95rem);
-            opacity: 0.9;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-        }
-
-        /* ─── BOTÃO EPISÓDIOS (TOPO DIREITA) ─── */
+        /* ─── BOTÃO EPISÓDIOS E POPUP ─── */
         .episodes-toggle {
             position: absolute;
             top: calc(16px + env(safe-area-inset-top));
@@ -151,126 +120,62 @@
             z-index: 100;
         }
 
-        .episodes-toggle:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
+        .episodes-toggle:hover { background: rgba(255, 255, 255, 0.2); }
 
-        /* ─── POPUP (MODAL) CENTRAL DE EPISÓDIOS ─── */
         .episodes-modal {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(10px);
-            z-index: 9999;
-            display: none; 
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
         }
 
-        .episodes-modal.active {
-            display: flex;
-        }
+        .episodes-modal.active { display: flex; }
 
         .modal-content {
-            width: 90%;
-            max-height: 80vh;
-            background: rgba(20, 20, 20, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
+            width: 90%; max-height: 80vh; background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px;
+            padding: 20px; display: flex; flex-direction: column;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            font-size: 1.3rem;
-            font-weight: bold;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 1.5rem;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .close-btn:hover {
-            color: #fff;
-        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; font-size: 1.3rem; font-weight: bold; }
+        .close-btn { background: none; border: none; color: rgba(255, 255, 255, 0.7); font-size: 1.5rem; cursor: pointer; transition: 0.2s; }
+        .close-btn:hover { color: #fff; }
 
         .episodes-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-            gap: 10px;
-            overflow-y: auto;
-            padding-right: 5px;
-            
-            scrollbar-width: none;
-            -ms-overflow-style: none;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 10px; overflow-y: auto; padding-right: 5px; scrollbar-width: none; -ms-overflow-style: none;
         }
-
-        .episodes-grid::-webkit-scrollbar {
-            display: none;
-        }
+        .episodes-grid::-webkit-scrollbar { display: none; }
 
         .ep-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: white;
-            padding: 12px 0;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: bold;
-            transition: 0.2s;
-            text-align: center;
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white; padding: 12px 0; border-radius: 8px; cursor: pointer;
+            font-size: 1rem; font-weight: bold; transition: 0.2s; text-align: center;
         }
-
-        .ep-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
+        .ep-btn:hover { background: rgba(255, 255, 255, 0.3); }
     </style>
 </head>
 <body>
 
     <div class="app-shell">
-        
-        <!-- POPUP DE EPISÓDIOS -->
         <div id="episodes-modal" class="episodes-modal">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3>Episódios</h3>
                     <button class="close-btn" onclick="toggleMenu()">✕</button>
                 </div>
-                <div class="episodes-grid" id="episodes-grid">
-                    <!-- Botões injetados via JS -->
-                </div>
+                <div class="episodes-grid" id="episodes-grid"></div>
             </div>
         </div>
 
-        <!-- FEED DO TIKTOK -->
-        <div class="feed-container" id="feed">
-            <!-- Vídeos injetados via JS -->
-        </div>
+        <div class="feed-container" id="feed"></div>
     </div>
 
     <script>
         try { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } catch(e){}
 
         const params = new URLSearchParams(window.location.search);
-        
         const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série Teste';
         const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
         const epsComprimidos = params.get('eps');
@@ -313,17 +218,15 @@
             card.id = `card-ep-${index}`; 
             card.setAttribute('data-index', index); 
 
+            // Removi a tag "info-desc" que estava órfã no seu HTML
             card.innerHTML = `
                 <video-player>
                     <video-skin>
-                        <!-- AQUI ESTÁ A MÁGICA: metadata carrega só o primeiro segundo do vídeo -->
                         <video data-src="${item.url}" loop playsinline preload="metadata"></video>
-                        
                         <media-controls>
                             <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
                             <div class="info-overlay">
                                 <div class="info-title">${item.titulo}</div>
-                                <div class="info-desc">${item.descricao}</div>
                             </div>
                         </media-controls>
                     </video-skin>
@@ -332,7 +235,7 @@
             feedContainer.appendChild(card);
         });
 
-        // ─── OBSERVER OTIMIZADO PARA NÃO DERRUBAR O CLOUDFLARE ───
+        // ─── OBSERVER OTIMIZADO ───
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 const cardIndex = parseInt(entry.target.getAttribute('data-index'));
@@ -340,7 +243,6 @@
                 if (!video) return;
 
                 if (entry.isIntersecting) {
-                    // 1. Toca o vídeo atual
                     if (!video.src) {
                         video.src = video.getAttribute('data-src');
                     }
@@ -349,7 +251,6 @@
                         video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
                     }).catch(() => { console.log("Autoplay bloqueado."); });
 
-                    // 2. Pré-carrega APENAS O PRÓXIMO vídeo (1 à frente)
                     const proximoIndex = cardIndex + 1;
                     if (proximoIndex < playlist.length) {
                         const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
@@ -362,27 +263,22 @@
                     }
 
                 } else {
-                    // Quando o vídeo sai da tela:
                     clearTimeout(video.unmuteTimeout);
                     video.pause();
                     video.muted = true;
 
-                    // 3. FAXINA DE CONEXÃO: Se o vídeo ficou muito para trás, corta a conexão com o Go
-                    // Isso impede o navegador de manter dezenas de conexões pausadas abertas
                     if (Math.abs(cardIndex - getIndexVisivelAtual()) > 2) {
                         video.removeAttribute('src'); 
-                        video.load(); // Força o navegador a matar o download em andamento
+                        video.load(); 
                     }
                 }
             });
         }, { root: feedContainer, threshold: 0.6 });
 
-        // Função auxiliar para saber qual episódio está na tela agora
         function getIndexVisivelAtual() {
             let visivel = 0;
             document.querySelectorAll('.video-card').forEach(card => {
                 const rect = card.getBoundingClientRect();
-                // Se o topo do card estiver perto do topo da tela
                 if (rect.top >= -100 && rect.top <= window.innerHeight / 2) {
                     visivel = parseInt(card.getAttribute('data-index'));
                 }
