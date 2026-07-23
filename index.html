@@ -280,22 +280,17 @@
         const epGrid = document.getElementById('episodes-grid');
         let playlist = [];
 
-        window.toggleMenu = function() {
-            epModal.classList.toggle('active');
-        }
+        window.toggleMenu = function() { epModal.classList.toggle('active'); }
 
         if (epsComprimidos) {
             const listaEps = epsComprimidos.split(',');
-            
             listaEps.forEach((epItem, index) => {
                 const partes = epItem.split('_');
                 if(partes.length === 2) {
                     const id = partes[0];
                     const hash = partes[1];
-                    const urlCompleta = `${serverBase}/stream/${id}?hash=${hash}`;
-
                     playlist.push({
-                        url: urlCompleta,
+                        url: `${serverBase}/stream/${id}?hash=${hash}`,
                         titulo: `${tituloSerie} - Ep ${index + 1}`,
                         descricao: index < listaEps.length - 1 ? "▲ Deslize para cima para o próximo episódio" : "Último episódio da lista"
                     });
@@ -317,30 +312,28 @@
             const card = document.createElement('div');
             card.className = 'video-card';
             card.id = `card-ep-${index}`; 
-            card.setAttribute('data-index', index); // Guardamos o índice para o cérebro saber onde estamos
+            card.setAttribute('data-index', index); 
 
             card.innerHTML = `
                 <video-player>
                     <video-skin>
-                        <!-- Deixamos preload="auto" para que, assim que o JS colocar o link, ele já comece a baixar em segundo plano -->
-                        <video data-src="${item.url}" loop playsinline preload="auto"></video>
+                        <!-- AQUI ESTÁ A MÁGICA: metadata carrega só o primeiro segundo do vídeo -->
+                        <video data-src="${item.url}" loop playsinline preload="metadata"></video>
                         
                         <media-controls>
                             <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
-                            
                             <div class="info-overlay">
                                 <div class="info-title">${item.titulo}</div>
                                 <div class="info-desc">${item.descricao}</div>
                             </div>
                         </media-controls>
-
                     </video-skin>
                 </video-player>
             `;
             feedContainer.appendChild(card);
         });
 
-        // ─── CÉREBRO DE CARREGAMENTO INTELIGENTE (TIPO TIKTOK) ───
+        // ─── OBSERVER OTIMIZADO PARA NÃO DERRUBAR O CLOUDFLARE ───
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 const cardIndex = parseInt(entry.target.getAttribute('data-index'));
@@ -348,42 +341,55 @@
                 if (!video) return;
 
                 if (entry.isIntersecting) {
-                    
-                    // 1. Liga e dá play no vídeo atual
+                    // 1. Toca o vídeo atual
                     if (!video.src) {
                         video.src = video.getAttribute('data-src');
                     }
                     video.muted = true;
                     video.play().then(() => {
                         video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
-                    }).catch(() => {
-                        console.log("Autoplay bloqueado.");
-                    });
+                    }).catch(() => { console.log("Autoplay bloqueado."); });
 
-                    // 2. PRÉ-CARREGAMENTO MÁGICO (Os próximos 2 vídeos)
-                    // Ele avisa o navegador: "Ei, comece a baixar o Ep 2 e o Ep 3 silenciosamente"
-                    for (let i = 1; i <= 2; i++) {
-                        const proximoIndex = cardIndex + i;
-                        if (proximoIndex < playlist.length) {
-                            const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
-                            if (proximoCard) {
-                                const proximoVideo = proximoCard.querySelector('video');
-                                // Injeta o link se ainda estiver vazio, fazendo o navegador baixar o Status 206 na surdina
-                                if (proximoVideo && !proximoVideo.src) {
-                                    proximoVideo.src = proximoVideo.getAttribute('data-src');
-                                }
+                    // 2. Pré-carrega APENAS O PRÓXIMO vídeo (1 à frente)
+                    const proximoIndex = cardIndex + 1;
+                    if (proximoIndex < playlist.length) {
+                        const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
+                        if (proximoCard) {
+                            const proximoVideo = proximoCard.querySelector('video');
+                            if (proximoVideo && !proximoVideo.src) {
+                                proximoVideo.src = proximoVideo.getAttribute('data-src');
                             }
                         }
                     }
 
                 } else {
-                    // Quando o vídeo sai da tela, pausamos ele
+                    // Quando o vídeo sai da tela:
                     clearTimeout(video.unmuteTimeout);
                     video.pause();
                     video.muted = true;
+
+                    // 3. FAXINA DE CONEXÃO: Se o vídeo ficou muito para trás, corta a conexão com o Go
+                    // Isso impede o navegador de manter dezenas de conexões pausadas abertas
+                    if (Math.abs(cardIndex - getIndexVisivelAtual()) > 2) {
+                        video.removeAttribute('src'); 
+                        video.load(); // Força o navegador a matar o download em andamento
+                    }
                 }
             });
         }, { root: feedContainer, threshold: 0.6 });
+
+        // Função auxiliar para saber qual episódio está na tela agora
+        function getIndexVisivelAtual() {
+            let visivel = 0;
+            document.querySelectorAll('.video-card').forEach(card => {
+                const rect = card.getBoundingClientRect();
+                // Se o topo do card estiver perto do topo da tela
+                if (rect.top >= -100 && rect.top <= window.innerHeight / 2) {
+                    visivel = parseInt(card.getAttribute('data-index'));
+                }
+            });
+            return visivel;
+        }
 
         document.querySelectorAll('.video-card').forEach(card => observer.observe(card));
     </script>
