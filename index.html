@@ -197,139 +197,159 @@
     </div>
 
     <script>
-        try { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } catch(e){}
+        document.addEventListener('DOMContentLoaded', function() {
+            const tg = window.Telegram.WebApp;
+            const getBody = function() {
+                return (document.body || document.head || document.documentElement || document.doctype || document);
+            };
 
-        const params = new URLSearchParams(window.location.search);
-        const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série Teste';
-        const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
-        const epsComprimidos = params.get('eps');
+            // Validações de segurança do Telegram
+            try {
+                tg.ready();
+            } catch (e) {
+                getBody().innerHTML = '<div style="color:#ff5555;background:#000;height:100vh;display:flex;align-items:center;justify-content:center;font-size:1.3rem">Acesse apenas pelo Telegram</div>';
+                return;
+            }
 
-        const feedContainer = document.getElementById('feed');
-        const epModal = document.getElementById('episodes-modal');
-        const epGrid = document.getElementById('episodes-grid');
-        let playlist = [];
+            try {
+                tg.expand();
+            } catch (e) {}
 
-        window.toggleMenu = function() { epModal.classList.toggle('active'); }
+            // O comando de tela cheia que você pediu
+            try {
+                tg.requestFullscreen();
+            } catch (e) {}
 
-        if (epsComprimidos) {
-            const listaEps = epsComprimidos.split(',');
-            listaEps.forEach((epItem, index) => {
-                const partes = epItem.split('_');
-                if(partes.length === 2) {
-                    const id = partes[0];
-                    const hash = partes[1];
-                    playlist.push({
-                        url: `${serverBase}/stream/${id}?hash=${hash}`,
-                        titulo: `${tituloSerie} - Ep ${index + 1}`
-                    });
-                }
-            });
-        }
+            const params = new URLSearchParams(window.location.search);
+            const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série Teste';
+            const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
+            const epsComprimidos = params.get('eps');
 
-        // ─── CONSTRUÇÃO DA TELA ───
-        playlist.forEach((item, index) => {
-            const btn = document.createElement('button');
-            btn.className = 'ep-btn';
-            btn.innerText = `${index + 1}`; 
-            btn.addEventListener('click', () => {
-                epModal.classList.remove('active');
-                document.getElementById(`card-ep-${index}`).scrollIntoView({ behavior: 'auto' });
-            });
-            epGrid.appendChild(btn);
+            const feedContainer = document.getElementById('feed');
+            const epModal = document.getElementById('episodes-modal');
+            const epGrid = document.getElementById('episodes-grid');
+            let playlist = [];
 
-            const card = document.createElement('div');
-            card.className = 'video-card';
-            card.id = `card-ep-${index}`; 
-            card.setAttribute('data-index', index); 
+            window.toggleMenu = function() { epModal.classList.toggle('active'); }
 
-            card.innerHTML = `
-                <video-player>
-                    <video-skin>
-                        <!-- Removido o 'loop' para permitir detectar quando o vídeo acaba -->
-                        <video data-src="${item.url}" playsinline preload="metadata"></video>
-                        <media-controls>
-                            <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
-                            <div class="info-overlay">
-                                <div class="info-title">${item.titulo}</div>
-                            </div>
-                        </media-controls>
-                    </video-skin>
-                </video-player>
-            `;
-            feedContainer.appendChild(card);
-        });
-
-        // ─── EVENTO DE FIM DE VÍDEO (AUTO-SCROLL PARA O PRÓXIMO) ───
-        document.querySelectorAll('video').forEach((video, index) => {
-            video.addEventListener('ended', () => {
-                const proximoIndex = index + 1;
-                // Se ainda houver um próximo episódio na playlist, rola até ele de forma suave
-                if (proximoIndex < playlist.length) {
-                    const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
-                    if (proximoCard) {
-                        proximoCard.scrollIntoView({ behavior: 'smooth' });
+            if (epsComprimidos) {
+                const listaEps = epsComprimidos.split(',');
+                listaEps.forEach((epItem, index) => {
+                    const partes = epItem.split('_');
+                    if(partes.length === 2) {
+                        const id = partes[0];
+                        const hash = partes[1];
+                        playlist.push({
+                            url: `${serverBase}/stream/${id}?hash=${hash}`,
+                            titulo: `${tituloSerie} - Ep ${index + 1}`
+                        });
                     }
-                }
+                });
+            }
+
+            // ─── CONSTRUÇÃO DA TELA ───
+            playlist.forEach((item, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'ep-btn';
+                btn.innerText = `${index + 1}`; 
+                btn.addEventListener('click', () => {
+                    epModal.classList.remove('active');
+                    document.getElementById(`card-ep-${index}`).scrollIntoView({ behavior: 'auto' });
+                });
+                epGrid.appendChild(btn);
+
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.id = `card-ep-${index}`; 
+                card.setAttribute('data-index', index); 
+
+                card.innerHTML = `
+                    <video-player>
+                        <video-skin>
+                            <video data-src="${item.url}" playsinline preload="metadata"></video>
+                            <media-controls>
+                                <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
+                                <div class="info-overlay">
+                                    <div class="info-title">${item.titulo}</div>
+                                </div>
+                            </media-controls>
+                        </video-skin>
+                    </video-player>
+                `;
+                feedContainer.appendChild(card);
             });
-        });
 
-        // ─── CÉREBRO OTIMIZADO DE FORÇA MÁXIMA ───
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                const cardIndex = parseInt(entry.target.getAttribute('data-index'));
-                const video = entry.target.querySelector('video');
-                if (!video) return;
-
-                if (entry.isIntersecting) {
-                    video.loadTimer = setTimeout(() => {
-                        if (!video.src) {
-                            video.src = video.getAttribute('data-src');
+            // ─── EVENTO DE FIM DE VÍDEO (AUTO-SCROLL PARA O PRÓXIMO) ───
+            document.querySelectorAll('video').forEach((video, index) => {
+                video.addEventListener('ended', () => {
+                    const proximoIndex = index + 1;
+                    if (proximoIndex < playlist.length) {
+                        const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
+                        if (proximoCard) {
+                            proximoCard.scrollIntoView({ behavior: 'smooth' });
                         }
-                        video.muted = true;
-                        video.play().then(() => {
-                            video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
-                        }).catch(() => { console.log("Autoplay bloqueado."); });
+                    }
+                });
+            });
 
-                        const proximoIndex = cardIndex + 1;
-                        if (proximoIndex < playlist.length) {
-                            const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
-                            if (proximoCard) {
-                                const proximoVideo = proximoCard.querySelector('video');
-                                if (proximoVideo && !proximoVideo.src) {
-                                    proximoVideo.src = proximoVideo.getAttribute('data-src');
+            // ─── CÉREBRO OTIMIZADO DE FORÇA MÁXIMA ───
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const cardIndex = parseInt(entry.target.getAttribute('data-index'));
+                    const video = entry.target.querySelector('video');
+                    if (!video) return;
+
+                    if (entry.isIntersecting) {
+                        video.loadTimer = setTimeout(() => {
+                            if (!video.src) {
+                                video.src = video.getAttribute('data-src');
+                            }
+                            video.muted = true;
+                            video.play().then(() => {
+                                video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
+                            }).catch(() => { console.log("Autoplay bloqueado."); });
+
+                            const proximoIndex = cardIndex + 1;
+                            if (proximoIndex < playlist.length) {
+                                const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
+                                if (proximoCard) {
+                                    const proximoVideo = proximoCard.querySelector('video');
+                                    if (proximoVideo && !proximoVideo.src) {
+                                        proximoVideo.src = proximoVideo.getAttribute('data-src');
+                                    }
                                 }
                             }
-                        }
-                    }, 400);
+                        }, 400);
 
-                } else {
-                    clearTimeout(video.loadTimer);
-                    clearTimeout(video.unmuteTimeout);
-                    video.pause();
-                    video.muted = true;
+                    } else {
+                        clearTimeout(video.loadTimer);
+                        clearTimeout(video.unmuteTimeout);
+                        video.pause();
+                        video.muted = true;
 
-                    if (Math.abs(cardIndex - getIndexVisivelAtual()) > 2) {
-                        if (video.src) { 
-                            video.removeAttribute('src'); 
-                            video.load(); 
+                        if (Math.abs(cardIndex - getIndexVisivelAtual()) > 2) {
+                            if (video.src) { 
+                                video.removeAttribute('src'); 
+                                video.load(); 
+                            }
                         }
                     }
-                }
-            });
-        }, { root: feedContainer, threshold: 0.6 });
+                });
+            }, { root: feedContainer, threshold: 0.6 });
 
-        function getIndexVisivelAtual() {
-            let visivel = 0;
-            document.querySelectorAll('.video-card').forEach(card => {
-                const rect = card.getBoundingClientRect();
-                if (rect.top >= -100 && rect.top <= window.innerHeight / 2) {
-                    visivel = parseInt(card.getAttribute('data-index'));
-                }
-            });
-            return visivel;
-        }
+            function getIndexVisivelAtual() {
+                let visivel = 0;
+                document.querySelectorAll('.video-card').forEach(card => {
+                    const rect = card.getBoundingClientRect();
+                    if (rect.top >= -100 && rect.top <= window.innerHeight / 2) {
+                        visivel = parseInt(card.getAttribute('data-index'));
+                    }
+                });
+                return visivel;
+            }
 
-        document.querySelectorAll('.video-card').forEach(card => observer.observe(card));
+            document.querySelectorAll('.video-card').forEach(card => observer.observe(card));
+        });
     </script>
 </body>
 </html>
