@@ -76,8 +76,27 @@
         }
 
         video-player { display: contents; }
-        video-skin { display: block; width: 100%; height: 100%; --media-object-fit: cover; }
-        video { width: 100%; height: 100%; pointer-events: auto; }
+        video-skin { 
+            display: block; 
+            width: 100%; 
+            height: 100%; 
+            --media-object-fit: cover; 
+            
+            /* Remove a borda do componente do Video.js */
+            border-radius: 0 !important; 
+        }
+
+        video { 
+            width: 100%; 
+            height: 100%; 
+            pointer-events: auto; 
+            
+            /* Força o navegador do celular a tirar as bordas nativas */
+            border-radius: 0 !important; 
+            -webkit-border-radius: 0 !important;
+            -moz-border-radius: 0 !important;
+            outline: none !important;
+        }
         media-controls { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.25s; }
         media-controls:not([data-visible]) { opacity: 0; }
 
