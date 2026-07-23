@@ -225,8 +225,9 @@
             const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
             const epsComprimidos = params.get('eps');
             
-            // 👇 ADICIONE ESTA LINHA AQUI:
             const chatIdSerie = params.get('chat_id');
+            // 👇 ADICIONE ESTA LINHA:
+            const accessHashSerie = params.get('access_hash') || "0";
 
             const feedContainer = document.getElementById('feed');
             const epModal = document.getElementById('episodes-modal');
