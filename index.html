@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mini App - Dramas (Autoplay com Som Atrasado)</title>
+
+    <!-- Script Oficial do Telegram Mini Apps -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Video.js v10 (Web Components) Oficial -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/html/cdn/video.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ─── MOLDURA DO APP ─── */
+        .app-shell {
+            position: relative;
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            height: 100dvh; 
+            margin: 0 auto;
+            background: #000;
+            overflow: hidden;
+        }
+
+        @media (min-width: 481px) {
+            .app-shell {
+                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 90px rgba(0, 0, 0, 0.9);
+            }
+        }
+
+        /* ─── FEED (SEM BARRA DE ROLAGEM) ─── */
+        .feed-container {
+            height: 100%;
+            width: 100%;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            
+            scrollbar-width: none; 
+            -ms-overflow-style: none; 
+        }
+
+        .feed-container::-webkit-scrollbar {
+            display: none; 
+        }
+
+        .video-card {
+            height: 100%;
+            width: 100%;
+            scroll-snap-align: start;
+            position: relative;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        /* ─── CONFIGURAÇÃO DO PLAYER PADRÃO (VIDEO.JS) ─── */
+        video-player {
+            display: contents; 
+        }
+
+        video-skin {
+            display: block;
+            width: 100%;
+            height: 100%;
+            --media-object-fit: cover; 
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            pointer-events: auto; 
+        }
+
+        /* ─── TAG NATIVA DE CONTROLES (GERENCIA O AUTO-FADE) ─── */
+        media-controls {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            transition: opacity 0.25s;
+        }
+
+        media-controls:not([data-visible]) {
+            opacity: 0;
+        }
+
+        /* ─── INFORMAÇÕES DA SÉRIE (TÍTULO E DESCRIÇÃO) ─── */
+        .info-overlay {
+            position: absolute;
+            bottom: 0; 
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            padding-bottom: 90px; 
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+            pointer-events: none;
+        }
+        
+        .info-title {
+            font-size: clamp(1.1rem, 4vw, 1.3rem);
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+            overflow-wrap: anywhere;
+        }
+
+        .info-desc {
+            font-size: clamp(0.85rem, 3vw, 0.95rem);
+            opacity: 0.9;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+        }
+
+        /* ─── BOTÃO EPISÓDIOS (TOPO DIREITA) ─── */
+        .episodes-toggle {
+            position: absolute;
+            top: calc(16px + env(safe-area-inset-top));
+            right: 16px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            pointer-events: auto; 
+            transition: 0.2s;
+            z-index: 100;
+        }
+
+        .episodes-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ─── POPUP (MODAL) CENTRAL DE EPISÓDIOS ─── */
+        .episodes-modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            display: none; 
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .episodes-modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-height: 80vh;
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+        }
+
+        .episodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 10px;
+            overflow-y: auto;
+            padding-right: 5px;
+            
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .episodes-grid::-webkit-scrollbar {
+            display: none;
+        }
+
+        .ep-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            padding: 12px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: 0.2s;
+            text-align: center;
+        }
+
+        .ep-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-shell">
+        
+        <!-- POPUP DE EPISÓDIOS -->
+        <div id="episodes-modal" class="episodes-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Episódios</h3>
+                    <button class="close-btn" onclick="toggleMenu()">✕</button>
+                </div>
+                <div class="episodes-grid" id="episodes-grid">
+                    <!-- Botões injetados via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- FEED DO TIKTOK -->
+        <div class="feed-container" id="feed">
+            <!-- Vídeos injetados via JS -->
+        </div>
+    </div>
+
+    <script>
+        try { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } catch(e){}
+
+        const params = new URLSearchParams(window.location.search);
+        
+        // ─── LEITURA DOS PARÂMETROS COMPACTADOS ───
+        const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série Teste';
+        const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
+        const epsComprimidos = params.get('eps'); // Ex: "76_622df7,77_abcdef"
+
+        const feedContainer = document.getElementById('feed');
+        const epModal = document.getElementById('episodes-modal');
+        const epGrid = document.getElementById('episodes-grid');
+        let playlist = [];
+
+        window.toggleMenu = function() {
+            epModal.classList.toggle('active');
+        }
+
+        // ─── LÓGICA DE DADOS (DESCOMPACTADOR) ───
+        if (epsComprimidos) {
+            const listaEps = epsComprimidos.split(',');
+            
+            listaEps.forEach((epItem, index) => {
+                // Separa o ID do HASH que o Python juntou com o "_"
+                const partes = epItem.split('_');
+                if(partes.length === 2) {
+                    const id = partes[0];
+                    const hash = partes[1];
+                    
+                    // Remonta a URL completa mágica!
+                    const urlCompleta = `${serverBase}/stream/${id}?hash=${hash}`;
+
+                    playlist.push({
+                        url: urlCompleta,
+                        titulo: `${tituloSerie} - Ep ${index + 1}`,
+                        descricao: index < listaEps.length - 1 ? "▲ Deslize para cima para o próximo episódio" : "Último episódio da lista"
+                    });
+                }
+            });
+        } else {
+            // Fallback de teste local
+            playlist = [
+                { url: `${serverBase}/stream/7?hash=622df7`, titulo: "Teste - Ep 1", descricao: "Deslize para cima" },
+                { url: `${serverBase}/stream/6?hash=2f2ba9`, titulo: "Teste - Ep 2", descricao: "Fim" }
+            ];
+        }
+
+        // ─── CONSTRUÇÃO DA TELA (SEU CÓDIGO INTACTO) ───
+        playlist.forEach((item, index) => {
+
+            const btn = document.createElement('button');
+            btn.className = 'ep-btn';
+            btn.innerText = `${index + 1}`; 
+            btn.addEventListener('click', () => {
+                epModal.classList.remove('active');
+                document.getElementById(`card-ep-${index}`).scrollIntoView({ behavior: 'smooth' });
+            });
+            epGrid.appendChild(btn);
+
+            const card = document.createElement('div');
+            card.className = 'video-card';
+            card.id = `card-ep-${index}`; 
+
+            card.innerHTML = `
+                <video-player>
+                    <video-skin>
+                        <video src="${item.url}" loop autoplay muted playsinline></video>
+                        
+                        <media-controls>
+                            <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
+                            
+                            <div class="info-overlay">
+                                <div class="info-title">${item.titulo}</div>
+                                <div class="info-desc">${item.descricao}</div>
+                            </div>
+                        </media-controls>
+
+                    </video-skin>
+                </video-player>
+            `;
+            feedContainer.appendChild(card);
+        });
+
+        // ─── OBSERVER (SEU CÓDIGO INTACTO) ───
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const video = entry.target.querySelector('video');
+                if (!video) return;
+
+                if (entry.isIntersecting) {
+                    video.muted = true;
+                    video.play().then(() => {
+                        video.unmuteTimeout = setTimeout(() => {
+                            video.muted = false;
+                        }, 1000);
+                    }).catch(() => {
+                        console.log("Autoplay bloqueado pelo navegador.");
+                    });
+                } else {
+                    clearTimeout(video.unmuteTimeout);
+                    video.pause();
+                    video.currentTime = 0; 
+                    video.muted = true;
+                }
+            });
+        }, { root: feedContainer, threshold: 0.6 });
+
+        document.querySelectorAll('.video-card').forEach(card => observer.observe(card));
+    </script>
+</body>
+</html>
