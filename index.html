@@ -42,8 +42,6 @@
             margin: 0 auto;
             background: #000;
             overflow: hidden;
-            
-            /* Adicione isto: */
             border-radius: 0 !important;
         }
 
@@ -76,12 +74,11 @@
             position: relative;
             background-color: #000;
             overflow: hidden;
-            border-radius: 0 !important; /* Garante que o card seja 100% quadrado */
+            border-radius: 0 !important;
         }
 
         video-player { 
             display: contents; 
-            /* Força o componente a não usar bordas arredondadas no Shadow DOM */
             --media-border-radius: 0px !important;
             --media-control-bar-border-radius: 0px !important;
         }
@@ -92,7 +89,6 @@
             height: 100%; 
             --media-object-fit: cover; 
             --media-border-radius: 0px !important;
-            
             border-radius: 0 !important; 
         }
 
@@ -100,13 +96,12 @@
             width: 100%; 
             height: 100%; 
             pointer-events: auto; 
-            
-            /* Força o navegador do celular a tirar as bordas nativas */
             border-radius: 0 !important; 
             -webkit-border-radius: 0 !important;
             -moz-border-radius: 0 !important;
             outline: none !important;
         }
+
         media-controls { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.25s; }
         media-controls:not([data-visible]) { opacity: 0; }
 
@@ -238,7 +233,6 @@
             btn.innerText = `${index + 1}`; 
             btn.addEventListener('click', () => {
                 epModal.classList.remove('active');
-                // TÉCNICA 1: Trocamos 'smooth' por 'auto'. Pulo imediato sem engasgar o servidor!
                 document.getElementById(`card-ep-${index}`).scrollIntoView({ behavior: 'auto' });
             });
             epGrid.appendChild(btn);
@@ -251,7 +245,8 @@
             card.innerHTML = `
                 <video-player>
                     <video-skin>
-                        <video data-src="${item.url}" loop playsinline preload="metadata"></video>
+                        <!-- Removido o 'loop' para permitir detectar quando o vídeo acaba -->
+                        <video data-src="${item.url}" playsinline preload="metadata"></video>
                         <media-controls>
                             <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
                             <div class="info-overlay">
@@ -264,6 +259,20 @@
             feedContainer.appendChild(card);
         });
 
+        // ─── EVENTO DE FIM DE VÍDEO (AUTO-SCROLL PARA O PRÓXIMO) ───
+        document.querySelectorAll('video').forEach((video, index) => {
+            video.addEventListener('ended', () => {
+                const proximoIndex = index + 1;
+                // Se ainda houver um próximo episódio na playlist, rola até ele de forma suave
+                if (proximoIndex < playlist.length) {
+                    const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
+                    if (proximoCard) {
+                        proximoCard.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }
+            });
+        });
+
         // ─── CÉREBRO OTIMIZADO DE FORÇA MÁXIMA ───
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
@@ -272,10 +281,7 @@
                 if (!video) return;
 
                 if (entry.isIntersecting) {
-                    // TÉCNICA 2: O Temporizador (Debounce). Esperamos 400ms.
-                    // Se a pessoa rolar a tela antes de dar 400ms, a gente aborta tudo!
                     video.loadTimer = setTimeout(() => {
-                        // 1. Só liga o vídeo se a pessoa realmente parou nele
                         if (!video.src) {
                             video.src = video.getAttribute('data-src');
                         }
@@ -284,8 +290,6 @@
                             video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
                         }).catch(() => { console.log("Autoplay bloqueado."); });
 
-                        // 2. O pré-carregamento foi movido pra dentro do timer!
-                        // Assim ele NUNCA vai pré-carregar vídeos que você só passou direto na rolagem
                         const proximoIndex = cardIndex + 1;
                         if (proximoIndex < playlist.length) {
                             const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
@@ -296,18 +300,16 @@
                                 }
                             }
                         }
-                    }, 400); // 400 milissegundos de carência
+                    }, 400);
 
                 } else {
-                    // SE SAIU DA TELA: Cortamos o temporizador na hora! Zero gasto de banda.
                     clearTimeout(video.loadTimer);
                     clearTimeout(video.unmuteTimeout);
                     video.pause();
                     video.muted = true;
 
-                    // Faxina pesada: Mata qualquer conexão de quem ficou pra trás
                     if (Math.abs(cardIndex - getIndexVisivelAtual()) > 2) {
-                        if (video.src) { // Só remove se já tiver link, pra poupar o navegador
+                        if (video.src) { 
                             video.removeAttribute('src'); 
                             video.load(); 
                         }
