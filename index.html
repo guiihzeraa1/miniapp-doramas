@@ -111,7 +111,7 @@
             bottom: 0; 
             left: 0;
             width: 100%;
-            padding: 20px;
+            padding: 20px 15px; /* Ajustado para dar mais espaço lateral */
             padding-bottom: 90px; 
             background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
             pointer-events: none;
@@ -123,10 +123,11 @@
             margin-bottom: 5px;
             text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
             
-            /* Ocupa 100% e divide o texto de forma harmônica */
+            /* Correção do Título: Linha única com "..." no final */
             width: 100%;
-            line-height: 1.3;
-            text-wrap: balance;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ─── BOTÃO EPISÓDIOS E POPUP ─── */
@@ -207,30 +208,20 @@
                 return (document.body || document.head || document.documentElement || document.doctype || document);
             };
 
-            // Validações de segurança do Telegram
-            try {
-                tg.ready();
-            } catch (e) {
+            try { tg.ready(); } catch (e) {
                 getBody().innerHTML = '<div style="color:#ff5555;background:#000;height:100vh;display:flex;align-items:center;justify-content:center;font-size:1.3rem">Acesse apenas pelo Telegram</div>';
                 return;
             }
 
-            try {
-                tg.expand();
-            } catch (e) {}
-
-            // O comando de tela cheia
-            try {
-                tg.requestFullscreen();
-            } catch (e) {}
+            try { tg.expand(); tg.requestFullscreen(); } catch (e) {}
 
             const params = new URLSearchParams(window.location.search);
             const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série Teste';
             const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
             const epsComprimidos = params.get('eps');
             
-            const chatIdSerie = params.get('chat_id');
-            const accessHashSerie = params.get('access_hash') || "0"; // Nova variável lida da URL
+            const chatIdSerie = params.get('chat_id') || "";
+            const accessHashSerie = params.get('access_hash') || "0"; 
 
             const feedContainer = document.getElementById('feed');
             const epModal = document.getElementById('episodes-modal');
@@ -239,16 +230,31 @@
 
             window.toggleMenu = function() { epModal.classList.toggle('active'); }
 
+            // ─── FUNÇÃO CRIPTOGRÁFICA (ASSINATURA DE PING) ───
+            async function assinarPing(hashUrl, tempoVideo) {
+                const texto = hashUrl + tempoVideo;
+                const buffer = new TextEncoder().encode(texto);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+
+            // ─── LÓGICA DE EXTRAÇÃO E SEGURANÇA ───
             if (epsComprimidos) {
                 const listaEps = epsComprimidos.split(',');
                 listaEps.forEach((epItem, index) => {
                     const partes = epItem.split('_');
-                    if(partes.length === 2) {
+                    if(partes.length >= 3) {
                         const id = partes[0];
                         const hash = partes[1];
+                        const exp = partes[2]; 
+                        
                         playlist.push({
-                            // 👇 URL corrigida para incluir o access_hash
-                            url: `${serverBase}/stream/${id}?hash=${hash}&chat_id=${chatIdSerie}&access_hash=${accessHashSerie}`,
+                            hashSec: hash, // Guardamos o hash para o ping assinado
+                            // Rota de Troca (Handshake VOUCHER)
+                            authUrl: `${serverBase}/autorizar/${id}?hash=${hash}&chat_id=${chatIdSerie}&access_hash=${accessHashSerie}&exp=${exp}`,
+                            // Rota Base do Vídeo (Precisará do Token)
+                            streamUrlBase: `${serverBase}/stream/${id}?chat_id=${chatIdSerie}&access_hash=${accessHashSerie}`,
                             titulo: `${tituloSerie} - Ep ${index + 1}`
                         });
                     }
@@ -271,10 +277,11 @@
                 card.id = `card-ep-${index}`; 
                 card.setAttribute('data-index', index); 
 
+                // O vídeo nasce "vazio" (sem src). A url será gerada via Handshake
                 card.innerHTML = `
                     <video-player>
                         <video-skin>
-                            <video data-src="${item.url}" playsinline preload="metadata"></video>
+                            <video playsinline preload="none"></video>
                             <media-controls>
                                 <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
                                 <div class="info-overlay">
@@ -285,58 +292,92 @@
                     </video-player>
                 `;
                 feedContainer.appendChild(card);
-            });
 
-            // ─── EVENTO DE FIM DE VÍDEO (AUTO-SCROLL PARA O PRÓXIMO) ───
-            document.querySelectorAll('video').forEach((video, index) => {
-                video.addEventListener('ended', () => {
+                const videoObj = card.querySelector('video');
+
+                // EVENTOS DO HEARTBEAT ASSINADO E AUTO-SCROLL
+                videoObj.addEventListener('play', () => {
+                    clearInterval(videoObj.heartbeatInterval); 
+                    videoObj.heartbeatInterval = setInterval(async () => {
+                        if (videoObj.paused || videoObj.readyState === 0) return;
+                        
+                        const tempoAtual = Math.floor(videoObj.currentTime);
+                        const tokenDinamico = await assinarPing(item.hashSec, tempoAtual);
+                        
+                        const pingUrl = `${serverBase}/ping?hash=${item.hashSec}&time=${tempoAtual}&token=${tokenDinamico}`;
+                        fetch(pingUrl, { method: 'GET', mode: 'no-cors' }).catch(()=> {});
+                    }, 10000); 
+                });
+
+                videoObj.addEventListener('pause', () => clearInterval(videoObj.heartbeatInterval));
+                videoObj.addEventListener('ended', () => {
+                    clearInterval(videoObj.heartbeatInterval);
                     const proximoIndex = index + 1;
                     if (proximoIndex < playlist.length) {
                         const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
-                        if (proximoCard) {
-                            proximoCard.scrollIntoView({ behavior: 'smooth' });
-                        }
+                        if (proximoCard) proximoCard.scrollIntoView({ behavior: 'smooth' });
                     }
                 });
             });
 
-            // ─── CÉREBRO OTIMIZADO DE FORÇA MÁXIMA ───
+            // ─── FUNÇÃO DE CARREGAMENTO SEGURO (HANDSHAKE) ───
+            async function carregarVideoComSeguranca(videoElement, itemData) {
+                // Só carrega se não tiver src configurado ainda
+                if (!videoElement.getAttribute('src')) {
+                    try {
+                        const res = await fetch(itemData.authUrl);
+                        if (!res.ok) throw new Error("Acesso Bloqueado pelo Servidor");
+                        
+                        // Pegamos o Token amarrado ao IP
+                        const tokenDeIP = await res.text();
+                        
+                        // Montamos o link real e injetamos no player
+                        videoElement.setAttribute('src', `${itemData.streamUrlBase}&token=${tokenDeIP}`);
+                        videoElement.load();
+                    } catch (error) {
+                        console.error("Falha de Handshake:", error);
+                    }
+                }
+            }
+
+            // ─── CÉREBRO OTIMIZADO (OBSERVER) ───
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     const cardIndex = parseInt(entry.target.getAttribute('data-index'));
                     const video = entry.target.querySelector('video');
+                    const itemData = playlist[cardIndex];
                     if (!video) return;
 
                     if (entry.isIntersecting) {
-                        video.loadTimer = setTimeout(() => {
-                            if (!video.src) {
-                                video.src = video.getAttribute('data-src');
-                            }
+                        video.loadTimer = setTimeout(async () => {
+                            
+                            // Autentica e carrega o vídeo atual (se não foi carregado)
+                            await carregarVideoComSeguranca(video, itemData);
+
                             video.muted = true;
                             video.play().then(() => {
                                 video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
-                            }).catch(() => { console.log("Autoplay bloqueado."); });
+                            }).catch(() => { console.log("Autoplay bloqueado pelo navegador."); });
 
+                            // Tenta carregar o próximo vídeo (Handshake pré-buffer)
                             const proximoIndex = cardIndex + 1;
                             if (proximoIndex < playlist.length) {
                                 const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
                                 if (proximoCard) {
                                     const proximoVideo = proximoCard.querySelector('video');
-                                    if (proximoVideo && !proximoVideo.src) {
-                                        proximoVideo.src = proximoVideo.getAttribute('data-src');
-                                    }
+                                    carregarVideoComSeguranca(proximoVideo, playlist[proximoIndex]);
                                 }
                             }
-                        }, 400);
-
+                        }, 400); // 400ms delay para evitar requests se o usuário rolar rápido demais
                     } else {
                         clearTimeout(video.loadTimer);
                         clearTimeout(video.unmuteTimeout);
                         video.pause();
                         video.muted = true;
 
+                        // Libera a memória de vídeos distantes
                         if (Math.abs(cardIndex - getIndexVisivelAtual()) > 2) {
-                            if (video.src) { 
+                            if (video.getAttribute('src')) { 
                                 video.removeAttribute('src'); 
                                 video.load(); 
                             }
