@@ -30,6 +30,7 @@
         .episodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; overflow-y: auto; scrollbar-width: none; }
         .episodes-grid::-webkit-scrollbar { display: none; }
         .ep-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 12px 0; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: center; }
+        .ep-btn:hover { background: rgba(255, 255, 255, 0.3); }
     </style>
 </head>
 <body>
@@ -93,6 +94,7 @@
                 feedContainer.appendChild(card);
 
                 const videoObj = card.querySelector('video');
+                
                 videoObj.addEventListener('play', () => {
                     clearInterval(videoObj.heartbeatInterval); 
                     videoObj.heartbeatInterval = setInterval(async () => {
@@ -102,7 +104,9 @@
                         fetch(`${serverBase}/ping?hash=${item.hashSec}&time=${tempo}&token=${token}`, { method: 'GET', mode: 'no-cors' }).catch(()=>{});
                     }, 10000); 
                 });
+                
                 videoObj.addEventListener('pause', () => clearInterval(videoObj.heartbeatInterval));
+                
                 videoObj.addEventListener('ended', () => {
                     clearInterval(videoObj.heartbeatInterval);
                     const proximoCard = document.getElementById(`card-ep-${index + 1}`);
@@ -110,28 +114,24 @@
                 });
             });
 
+            // ─── CARREGAMENTO RÁPIDO (SEM FILA) ───
             async function carregarVideoComSeguranca(videoElement, itemData) {
-                // TRAVA: Se já está buscando o token, não faz de novo!
+                // Impede múltiplos envios simultâneos para a mesma autorização
                 if (videoElement.isFetchingAuth) return; 
 
-                // Só carrega se não tiver src configurado ainda
                 if (!videoElement.getAttribute('src')) {
-                    videoElement.isFetchingAuth = true; // Tranca a porta
-                    
+                    videoElement.isFetchingAuth = true; 
                     try {
                         const res = await fetch(itemData.authUrl);
-                        if (!res.ok) throw new Error("Acesso Bloqueado pelo Servidor");
-                        
-                        // Pegamos o Token amarrado ao IP
-                        const tokenDeIP = await res.text();
-                        
-                        // Montamos o link real e injetamos no player
-                        videoElement.setAttribute('src', `${itemData.streamUrlBase}&token=${tokenDeIP}`);
-                        videoElement.load();
+                        if (res.ok) {
+                            const tokenDeIP = await res.text();
+                            videoElement.setAttribute('src', `${itemData.streamUrlBase}&token=${tokenDeIP}`);
+                            videoElement.load();
+                        }
                     } catch (error) {
                         console.error("Falha de Handshake:", error);
                     } finally {
-                        videoElement.isFetchingAuth = false; // Destranca a porta
+                        videoElement.isFetchingAuth = false;
                     }
                 }
             }
@@ -144,17 +144,38 @@
 
                     if (entry.isIntersecting) {
                         video.loadTimer = setTimeout(async () => {
+                            
+                            // Carrega o vídeo atual instantaneamente
                             await carregarVideoComSeguranca(video, playlist[cardIndex]);
+                            
                             video.muted = true;
-                            video.play().then(() => { video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000); }).catch(() => {});
+                            video.play().then(() => { 
+                                video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000); 
+                            }).catch(() => {});
+                            
+                            // Pré-carrega o PRÓXIMO vídeo simultaneamente (Otimização máxima)
                             const proximoCard = document.getElementById(`card-ep-${cardIndex + 1}`);
-                            if (proximoCard) carregarVideoComSeguranca(proximoCard.querySelector('video'), playlist[cardIndex + 1]);
-                        }, 400);
+                            if (proximoCard) {
+                                carregarVideoComSeguranca(proximoCard.querySelector('video'), playlist[cardIndex + 1]);
+                            }
+
+                        }, 400); // 400ms delay apenas para o scroll passar direto
                     } else {
                         clearTimeout(video.loadTimer); clearTimeout(video.unmuteTimeout);
                         video.pause(); video.muted = true;
-                        if (Math.abs(cardIndex - (function(){ let v=0; document.querySelectorAll('.video-card').forEach(c=>{ const r=c.getBoundingClientRect(); if(r.top>=-100 && r.top<=window.innerHeight/2) v=parseInt(c.getAttribute('data-index')); }); return v; })()) > 2) {
-                            if (video.getAttribute('src')) { video.removeAttribute('src'); video.load(); }
+                        
+                        // Limpeza de memória
+                        let v = 0; 
+                        document.querySelectorAll('.video-card').forEach(c => { 
+                            const r = c.getBoundingClientRect(); 
+                            if(r.top >= -100 && r.top <= window.innerHeight/2) v = parseInt(c.getAttribute('data-index')); 
+                        });
+                        
+                        if (Math.abs(cardIndex - v) > 2) {
+                            if (video.getAttribute('src')) { 
+                                video.removeAttribute('src'); 
+                                video.load(); 
+                            }
                         }
                     }
                 });
