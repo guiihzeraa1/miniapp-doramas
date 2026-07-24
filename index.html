@@ -10,33 +10,67 @@
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; background-color: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         
-        .app-shell { position: relative; width: 100%; max-width: 480px; height: 100dvh; margin: 0 auto; background: #000; overflow: hidden; }
-        @media (min-width: 481px) { .app-shell { box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 0 90px rgba(0,0,0,0.9); } }
+        /* Correção para o Telegram Webview (Garante que a tela não colapse) */
+        html, body { 
+            height: 100%; 
+            height: -webkit-fill-available;
+            background-color: #000; 
+            color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            overflow: hidden; 
+        }
         
-        .feed-container { height: 100%; width: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+        .app-shell { 
+            position: relative; 
+            width: 100%; 
+            max-width: 480px; 
+            height: 100%; 
+            margin: 0 auto; 
+            background: #000; 
+            overflow: hidden; 
+        }
+        
+        .feed-container { 
+            height: 100%; 
+            width: 100%; 
+            overflow-y: scroll; 
+            scroll-snap-type: y mandatory; 
+            scroll-behavior: smooth; 
+            -webkit-overflow-scrolling: touch; 
+            scrollbar-width: none; 
+        }
         .feed-container::-webkit-scrollbar { display: none; }
         
-        .video-card { height: 100%; width: 100%; scroll-snap-align: start; position: relative; background-color: #000; overflow: hidden; }
+        .video-card { 
+            height: 100%; 
+            width: 100%; 
+            scroll-snap-align: start; 
+            position: relative; 
+            background-color: #000; 
+            overflow: hidden; 
+        }
         
-        /* ─── PLAYER NATIVO ─── */
+        /* ─── PLAYER NATIVO (Posicionamento Absoluto para não sumir) ─── */
         video { 
+            position: absolute;
+            top: 0; left: 0;
             width: 100%; 
             height: 100%; 
-            object-fit: cover; /* Preenche a tela toda igual TikTok */
+            object-fit: cover; 
             background-color: #000;
             outline: none;
+            display: block;
         }
 
-        /* ─── OVERLAY NO TOPO DA TELA (Para não brigar com os controles do video) ─── */
+        /* ─── OVERLAY DE TÍTULO ─── */
         .top-overlay { 
             position: absolute; 
             top: 0; left: 0; 
             width: 100%; 
             padding: 20px 15px 40px 15px; 
             background: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%); 
-            pointer-events: none; /* Clicks passam pelo degradê e vão para o video */
+            pointer-events: none; 
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
@@ -61,12 +95,10 @@
             font-size: 0.85rem;
             cursor: pointer; 
             backdrop-filter: blur(10px); 
-            pointer-events: auto; /* Esse botão pode ser clicado! */
-            transition: 0.2s;
+            pointer-events: auto; 
         }
-        .episodes-toggle:hover { background: rgba(255, 255, 255, 0.2); }
 
-        /* ─── MODAL DE EPISÓDIOS ─── */
+        /* ─── MODAL ─── */
         .episodes-modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
         .episodes-modal.active { display: flex; }
         .modal-content { width: 90%; max-height: 80vh; background: rgba(20,20,20,0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -75,7 +107,6 @@
         .episodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; overflow-y: auto; scrollbar-width: none; }
         .episodes-grid::-webkit-scrollbar { display: none; }
         .ep-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 12px 0; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: center; transition: 0.2s; }
-        .ep-btn:hover { background: rgba(255, 255, 255, 0.3); }
     </style>
 </head>
 <body>
@@ -137,7 +168,6 @@
                 const card = document.createElement('div');
                 card.className = 'video-card'; card.id = `card-ep-${index}`; card.setAttribute('data-index', index); 
                 
-                // Agora usamos o Player NATIVO perfeito do navegador
                 card.innerHTML = `
                     <video playsinline preload="none" controls controlslist="nodownload"></video>
                     <div class="top-overlay">
@@ -168,73 +198,78 @@
                 });
             });
 
-            // ─── CARREGAMENTO RÁPIDO CORRIGIDO (SEM BAGUNÇA NA REDE) ───
-            async function carregarVideoComSeguranca(videoElement, itemData) {
-                if (videoElement.isFetchingAuth) return; 
-
-                if (!videoElement.getAttribute('src')) {
-                    videoElement.isFetchingAuth = true; 
-                    try {
-                        const res = await fetch(itemData.authUrl);
-                        if (res.ok) {
-                            const tokenDeIP = await res.text();
-                            videoElement.setAttribute('src', `${itemData.streamUrlBase}&token=${tokenDeIP}`);
-                            videoElement.load();
-                        }
-                    } catch (error) {
-                        console.error("Falha de Handshake:", error);
-                    } finally {
-                        videoElement.isFetchingAuth = false;
+            // ─── CARREGADOR SEGURO E INDIVIDUAL ───
+            async function carregarVideoUnico(videoElement, itemData) {
+                if (videoElement.isFetchingAuth || videoElement.getAttribute('src')) return; 
+                
+                videoElement.isFetchingAuth = true; 
+                try {
+                    const res = await fetch(itemData.authUrl);
+                    if (res.ok) {
+                        const tokenDeIP = await res.text();
+                        videoElement.setAttribute('src', `${itemData.streamUrlBase}&token=${tokenDeIP}`);
+                        videoElement.load();
                     }
+                } catch (error) {
+                    console.error("Erro Handshake", error);
+                } finally {
+                    videoElement.isFetchingAuth = false;
                 }
             }
 
-            function getIndexVisivelAtual() {
-                let v = 0; 
-                document.querySelectorAll('.video-card').forEach(c => { 
-                    const r = c.getBoundingClientRect(); 
-                    // Se o topo do card estiver dentro da tela
-                    if(r.top >= -100 && r.top <= window.innerHeight/2) v = parseInt(c.getAttribute('data-index')); 
+            // ─── O MAESTRO (GERENCIADOR DE ORDEM E ESTADO) ───
+            let debounceTimer;
+            let activeIndex = 0;
+
+            function sincronizarFilaDeVideos(indexAtual) {
+                // 1. Pausa todos os vídeos que não são o atual
+                document.querySelectorAll('video').forEach((v, i) => {
+                    if (i !== indexAtual) v.pause();
                 });
-                return v;
+
+                // 2. Limpa vídeos distantes (RAM e Rede limpas!)
+                document.querySelectorAll('.video-card').forEach((card, i) => {
+                    const v = card.querySelector('video');
+                    // Se o vídeo não for o atual e não for o próximo, apaga ele!
+                    if (i < indexAtual - 1 || i > indexAtual + 1) {
+                        if (v.getAttribute('src')) {
+                            v.removeAttribute('src');
+                            v.load();
+                            v.isFetchingAuth = false; // Destranca para carregar no futuro
+                        }
+                    }
+                });
+
+                // 3. Carrega e Toca o vídeo ATUAL
+                const activeCard = document.getElementById(`card-ep-${indexAtual}`);
+                if (activeCard) {
+                    const activeVideo = activeCard.querySelector('video');
+                    carregarVideoUnico(activeVideo, playlist[indexAtual]).then(() => {
+                        activeVideo.play().catch(()=>{}); // Toca se o navegador permitir autoplay
+                    });
+                }
+
+                // 4. Carrega silenciosamente o PRÓXIMO vídeo (Preload)
+                const nextCard = document.getElementById(`card-ep-${indexAtual + 1}`);
+                if (nextCard) {
+                    const nextVideo = nextCard.querySelector('video');
+                    carregarVideoUnico(nextVideo, playlist[indexAtual + 1]);
+                }
             }
 
+            // O Observer agora SÓ atualiza a variável do Maestro
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
-                    const cardIndex = parseInt(entry.target.getAttribute('data-index'));
-                    const video = entry.target.querySelector('video');
-                    if (!video) return;
-
                     if (entry.isIntersecting) {
-                        // Inicia o carregamento com um atraso se o usuario parar no video
-                        video.loadTimer = setTimeout(async () => {
-                            
-                            // 1. Carrega o video visível
-                            await carregarVideoComSeguranca(video, playlist[cardIndex]);
-                            video.play().catch(() => { /* Autoplay bloqueado pelo celular do usuario, normal. */ });
-                            
-                            // 2. Prepara silenciosamente APENAS o próximo episódio
-                            const proximoCard = document.getElementById(`card-ep-${cardIndex + 1}`);
-                            if (proximoCard) {
-                                carregarVideoComSeguranca(proximoCard.querySelector('video'), playlist[cardIndex + 1]);
-                            }
-
-                        }, 300); // 300ms garante que se ele rolar rapido, nao dispara a rede
+                        activeIndex = parseInt(entry.target.getAttribute('data-index'));
                         
-                    } else {
-                        // Se o vídeo saiu da tela:
-                        clearTimeout(video.loadTimer);
-                        video.pause();
+                        // Se o usuário está arrastando a tela sem parar, não faz nada!
+                        clearTimeout(debounceTimer);
                         
-                        // Limpeza profunda de RAM: Se o vídeo ficou longe da tela, destrói o arquivo
-                        const distancia = Math.abs(cardIndex - getIndexVisivelAtual());
-                        if (distancia > 1) {
-                            if (video.getAttribute('src')) { 
-                                video.removeAttribute('src'); 
-                                video.load(); 
-                                video.isFetchingAuth = false; // Zera a trava de segurança!
-                            }
-                        }
+                        // Só executa o Maestro se ele parar a tela por 300ms no mesmo vídeo
+                        debounceTimer = setTimeout(() => {
+                            sincronizarFilaDeVideos(activeIndex);
+                        }, 300);
                     }
                 });
             }, { root: feedContainer, threshold: 0.6 });
