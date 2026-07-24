@@ -157,6 +157,12 @@
             font-size: 1rem; font-weight: bold; transition: 0.2s; text-align: center;
         }
         .ep-btn:hover { background: rgba(255, 255, 255, 0.3); }
+
+        /* 🔥 NOVA CLASSE: Marca o episódio atual com a cor solicitada */
+        .ep-btn.ativo {
+            background: rgb(125 96 255 / 79%);
+            border: 1px solid rgba(255, 255, 255, 0.5); /* Borda mais clara para dar destaque */
+        }
     </style>
 </head>
 <body>
@@ -185,7 +191,6 @@
             }
             try { tg.expand(); tg.requestFullscreen(); } catch (e) {}
 
-            // Lendo parâmetros repassados pelo Python
             const params = new URLSearchParams(window.location.search);
             const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série';
             const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : '';
@@ -193,7 +198,7 @@
             
             const chatIdSerie = params.get('chat_id') || "";
             const accessHashSerie = params.get('access_hash') || "0";
-            const userId = params.get('uid') || "Desconhecido"; // Para o banco de Bans do Go
+            const userId = params.get('uid') || "Desconhecido"; 
 
             const feedContainer = document.getElementById('feed');
             const epModal = document.getElementById('episodes-modal');
@@ -205,7 +210,7 @@
             if (epsComprimidos) {
                 const listaEps = epsComprimidos.split(',');
                 listaEps.forEach((epItem, index) => {
-                    const partes = epItem.split('_'); // Python envia: id_hash_exp
+                    const partes = epItem.split('_'); 
                     if(partes.length === 3) {
                         playlist.push({
                             authUrl: `${serverBase}/autorizar/${partes[0]}?hash=${partes[1]}&chat_id=${chatIdSerie}&access_hash=${accessHashSerie}&exp=${partes[2]}&uid=${userId}`,
@@ -222,6 +227,10 @@
                 // Botões do Modal
                 const btn = document.createElement('button');
                 btn.className = 'ep-btn';
+                
+                // 🔥 Adiciona a classe 'ativo' apenas no primeiro episódio na inicialização
+                if (index === 0) btn.classList.add('ativo');
+
                 btn.innerText = `${index + 1}`; 
                 btn.addEventListener('click', () => {
                     epModal.classList.remove('active');
@@ -235,7 +244,6 @@
                 card.id = `card-ep-${index}`; 
                 card.setAttribute('data-index', index); 
 
-                // 🔥 O SEGREDO DO AUTOPLAY: Tag <video> já nasce com 'muted' direto no HTML
                 card.innerHTML = `
                     <video-player>
                         <video-skin>
@@ -266,7 +274,7 @@
             // ─── CÉREBRO MAESTRO (OBSERVER + HANDSHAKE) ───
             let indexVisivelAtual = 0;
             let playTimer = null; 
-            let scrollTimeout = null; // 🔥 NOVA VARIÁVEL: O cronômetro de rolagem
+            let scrollTimeout = null; 
 
             const observer = new IntersectionObserver((entries) => {
                 let mudou = false;
@@ -277,25 +285,29 @@
                     }
                 });
                 
-                // 🔥 O TRUQUE DE MESTRE (DEBOUNCE):
                 if (mudou) {
-                    // Se a tela ainda está rolando, cancela o pedido anterior
+                    // 🔥 SEGREDO NOVO: Pinta de roxo o botão correspondente e apaga o resto instantaneamente
+                    document.querySelectorAll('.ep-btn').forEach((btn, idx) => {
+                        if (idx === indexVisivelAtual) {
+                            btn.classList.add('ativo');
+                        } else {
+                            btn.classList.remove('ativo');
+                        }
+                    });
+
+                    // Sistema de Debounce (Paciência para autorizar no servidor)
                     if (scrollTimeout) clearTimeout(scrollTimeout);
-                    
-                    // Só atira no servidor Go se a tela ficar parada por 300 milissegundos
                     scrollTimeout = setTimeout(() => {
                         sincronizarFilaDeVideos();
                     }, 300); 
                 }
             }, { root: feedContainer, threshold: 0.6 });
 
-            // Função que faz o Handshake com o Go e injeta o Token
             async function carregarVideoUnico(videoEl, playlistItem) {
                 if (!videoEl || !playlistItem) return;
-                if (videoEl.getAttribute('src')) return; // Se já tem src (já foi carregado), pula
+                if (videoEl.getAttribute('src')) return;
 
                 try {
-                    // Pede o Voucher na porta /autorizar
                     if (!playlistItem.tokenRecebido) {
                         const resposta = await fetch(playlistItem.authUrl);
                         if (!resposta.ok) {
@@ -304,7 +316,6 @@
                         }
                         playlistItem.tokenRecebido = await resposta.text();
                     }
-                    // Injeta a URL real do vídeo na tag
                     videoEl.setAttribute('src', `${playlistItem.streamUrlBase}&token=${playlistItem.tokenRecebido}`);
                     videoEl.load();
                 } catch (e) {
@@ -320,18 +331,15 @@
                     if (!video) return;
 
                     if (index === indexVisivelAtual) {
-                        // VÍDEO PRINCIPAL NA TELA
                         if (window.playTimer) clearTimeout(window.playTimer);
                         
                         carregarVideoUnico(video, item).then(() => {
-                            // 🔥 O SEGREDO DO AUTOPLAY 2: Espera 400ms para a tela parar de rolar
                             window.playTimer = setTimeout(() => {
-                                video.muted = true; // Reforça o mudo pro navegador não surtar
+                                video.muted = true;
                                 const playPromise = video.play();
                                 
                                 if (playPromise !== undefined) {
                                     playPromise.then(() => {
-                                        // Devolve o áudio suavemente após o vídeo já estar rodando
                                         setTimeout(() => { video.muted = false; }, 800);
                                     }).catch(err => console.log("O celular bloqueou autoplay no mudo:", err));
                                 }
@@ -339,13 +347,10 @@
                         });
                         
                     } else if (index === indexVisivelAtual + 1) {
-                        // PRÓXIMO VÍDEO (Pré-carregamento invisível)
                         video.pause();
                         video.muted = true;
                         carregarVideoUnico(video, item);
-
                     } else {
-                        // VÍDEOS DISTANTES (Descarrega para salvar RAM e Internet)
                         video.pause();
                         if (video.getAttribute('src')) {
                             video.removeAttribute('src');
