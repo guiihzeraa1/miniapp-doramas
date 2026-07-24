@@ -265,7 +265,8 @@
 
             // ─── CÉREBRO MAESTRO (OBSERVER + HANDSHAKE) ───
             let indexVisivelAtual = 0;
-            let playTimer = null; // Variável global para gerenciar os 400ms
+            let playTimer = null; 
+            let scrollTimeout = null; // 🔥 NOVA VARIÁVEL: O cronômetro de rolagem
 
             const observer = new IntersectionObserver((entries) => {
                 let mudou = false;
@@ -275,7 +276,17 @@
                         mudou = true;
                     }
                 });
-                if (mudou) sincronizarFilaDeVideos();
+                
+                // 🔥 O TRUQUE DE MESTRE (DEBOUNCE):
+                if (mudou) {
+                    // Se a tela ainda está rolando, cancela o pedido anterior
+                    if (scrollTimeout) clearTimeout(scrollTimeout);
+                    
+                    // Só atira no servidor Go se a tela ficar parada por 300 milissegundos
+                    scrollTimeout = setTimeout(() => {
+                        sincronizarFilaDeVideos();
+                    }, 300); 
+                }
             }, { root: feedContainer, threshold: 0.6 });
 
             // Função que faz o Handshake com o Go e injeta o Token
