@@ -197,8 +197,8 @@
                     if(partes.length >= 3) {
                         playlist.push({
                             hashSec: partes[1],
-                            authUrl: `${serverBase}/autorizar/${partes[0]}?hash=${partes[1]}&chat_id=${chatIdSerie}&access_hash=${accessHashSerie}&exp=${partes[2]}`,
-                            streamUrlBase: `${serverBase}/stream/${partes[0]}?chat_id=${chatIdSerie}&access_hash=${accessHashSerie}`,
+                            authUrl: `${serverBase}/autorizar/${partes[0]}?hash=${partes[1]}&chat_id=${chatIdSerie}&access_hash=${accessHashSerie}&exp=${partes[2]}&uid=${userId}`,
+                            streamUrlBase: `${serverBase}/stream/${partes[0]}?chat_id=${chatIdSerie}&access_hash=${accessHashSerie}&uid=${userId}`,
                             titulo: `${tituloSerie} - Ep ${index + 1}`
                         });
                     }
