@@ -111,14 +111,28 @@
             });
 
             async function carregarVideoComSeguranca(videoElement, itemData) {
+                // TRAVA: Se já está buscando o token, não faz de novo!
+                if (videoElement.isFetchingAuth) return; 
+
+                // Só carrega se não tiver src configurado ainda
                 if (!videoElement.getAttribute('src')) {
+                    videoElement.isFetchingAuth = true; // Tranca a porta
+                    
                     try {
                         const res = await fetch(itemData.authUrl);
-                        if (!res.ok) return;
+                        if (!res.ok) throw new Error("Acesso Bloqueado pelo Servidor");
+                        
+                        // Pegamos o Token amarrado ao IP
                         const tokenDeIP = await res.text();
+                        
+                        // Montamos o link real e injetamos no player
                         videoElement.setAttribute('src', `${itemData.streamUrlBase}&token=${tokenDeIP}`);
                         videoElement.load();
-                    } catch (e) {}
+                    } catch (error) {
+                        console.error("Falha de Handshake:", error);
+                    } finally {
+                        videoElement.isFetchingAuth = false; // Destranca a porta
+                    }
                 }
             }
 
