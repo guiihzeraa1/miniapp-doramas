@@ -4,222 +4,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mini App - Dramas</title>
-
-    <!-- Script Oficial do Telegram Mini Apps -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-    <!-- Video.js v10 (Web Components) Oficial -->
     <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/html/cdn/video.js"></script>
-
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html, body {
-            height: 100%;
-        }
-
-        body {
-            background-color: #000;
-            color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* ─── MOLDURA DO APP ─── */
-        .app-shell {
-            position: relative;
-            width: 100%;
-            max-width: 480px;
-            height: 100vh;
-            height: 100dvh; 
-            margin: 0 auto;
-            background: #000;
-            overflow: hidden;
-            border-radius: 0 !important;
-        }
-
-        @media (min-width: 481px) {
-            .app-shell {
-                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 90px rgba(0, 0, 0, 0.9);
-            }
-        }
-
-        /* ─── FEED (SEM BARRA DE ROLAGEM) ─── */
-        .feed-container {
-            height: 100%;
-            width: 100%;
-            overflow-y: scroll;
-            scroll-snap-type: y mandatory;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none; 
-            -ms-overflow-style: none; 
-        }
-
-        .feed-container::-webkit-scrollbar {
-            display: none; 
-        }
-
-        .video-card {
-            height: 100%;
-            width: 100%;
-            scroll-snap-align: start;
-            position: relative;
-            background-color: #000;
-            overflow: hidden;
-            border-radius: 0 !important;
-        }
-
-        video-player { 
-            display: contents; 
-            --media-border-radius: 0px !important;
-            --media-control-bar-border-radius: 0px !important;
-        }
-        
-        video-skin { 
-            display: block; 
-            width: 100%; 
-            height: 100%; 
-            --media-object-fit: cover; 
-            --media-border-radius: 0px !important;
-            border-radius: 0 !important; 
-        }
-
-        video { 
-            width: 100%; 
-            height: 100%; 
-            pointer-events: auto; 
-            border-radius: 0 !important; 
-            -webkit-border-radius: 0 !important;
-            -moz-border-radius: 0 !important;
-            outline: none !important;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; background-color: #000; color: #fff; font-family: sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        .app-shell { position: relative; width: 100%; max-width: 480px; height: 100dvh; margin: 0 auto; background: #000; overflow: hidden; }
+        @media (min-width: 481px) { .app-shell { box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 0 90px rgba(0,0,0,0.9); } }
+        .feed-container { height: 100%; width: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+        .feed-container::-webkit-scrollbar { display: none; }
+        .video-card { height: 100%; width: 100%; scroll-snap-align: start; position: relative; background-color: #000; overflow: hidden; }
+        video-player { display: contents; }
+        video-skin { display: block; width: 100%; height: 100%; --media-object-fit: cover; }
+        video { width: 100%; height: 100%; pointer-events: auto; outline: none !important; }
         media-controls { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.25s; }
         media-controls:not([data-visible]) { opacity: 0; }
-
-        /* ─── INFORMAÇÕES DA SÉRIE ─── */
-        .info-overlay {
-            position: absolute;
-            bottom: 0; 
-            left: 0;
-            width: 100%;
-            padding: 20px 15px; /* Ajustado para dar mais espaço lateral */
-            padding-bottom: 90px; 
-            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
-            pointer-events: none;
-        }
-        
-        .info-title {
-            font-size: clamp(1.1rem, 4vw, 1.3rem);
-            font-weight: bold;
-            margin-bottom: 5px;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-            
-            /* Correção do Título: Linha única com "..." no final */
-            width: 100%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* ─── BOTÃO EPISÓDIOS E POPUP ─── */
-        .episodes-toggle {
-            position: absolute;
-            bottom: 145px;
-            right: 16px;
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: bold;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            pointer-events: auto; 
-            transition: 0.2s;
-            z-index: 100;
-        }
-
-        .episodes-toggle:hover { background: rgba(255, 255, 255, 0.2); }
-
-        .episodes-modal {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999;
-            display: none; flex-direction: column; justify-content: center; align-items: center;
-        }
-
+        .info-overlay { position: absolute; bottom: 0; left: 0; width: 100%; padding: 20px 15px; padding-bottom: 90px; background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%); pointer-events: none; }
+        .info-title { font-size: clamp(1.1rem, 4vw, 1.3rem); font-weight: bold; margin-bottom: 5px; text-shadow: 1px 1px 3px rgba(0,0,0,0.9); width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .episodes-toggle { position: absolute; bottom: 145px; right: 16px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; backdrop-filter: blur(10px); pointer-events: auto; z-index: 100; }
+        .episodes-modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
         .episodes-modal.active { display: flex; }
-
-        .modal-content {
-            width: 90%; max-height: 80vh; background: rgba(20, 20, 20, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px;
-            padding: 20px; display: flex; flex-direction: column;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        }
-
+        .modal-content { width: 90%; max-height: 80vh; background: rgba(20,20,20,0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .modal-header h3 { margin: 0; font-size: 1.3rem; font-weight: bold; }
-        .close-btn { background: none; border: none; color: rgba(255, 255, 255, 0.7); font-size: 1.5rem; cursor: pointer; transition: 0.2s; }
-        .close-btn:hover { color: #fff; }
-
-        .episodes-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-            gap: 10px; overflow-y: auto; padding-right: 5px; scrollbar-width: none; -ms-overflow-style: none;
-        }
+        .close-btn { background: none; border: none; color: rgba(255,255,255,0.7); font-size: 1.5rem; cursor: pointer; }
+        .episodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; overflow-y: auto; scrollbar-width: none; }
         .episodes-grid::-webkit-scrollbar { display: none; }
-
-        .ep-btn {
-            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15);
-            color: white; padding: 12px 0; border-radius: 8px; cursor: pointer;
-            font-size: 1rem; font-weight: bold; transition: 0.2s; text-align: center;
-        }
-        .ep-btn:hover { background: rgba(255, 255, 255, 0.3); }
+        .ep-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 12px 0; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
-
     <div class="app-shell">
         <div id="episodes-modal" class="episodes-modal">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Episódios</h3>
-                    <button class="close-btn" onclick="toggleMenu()">✕</button>
-                </div>
+                <div class="modal-header"><h3>Episódios</h3><button class="close-btn" onclick="toggleMenu()">✕</button></div>
                 <div class="episodes-grid" id="episodes-grid"></div>
             </div>
         </div>
-
         <div class="feed-container" id="feed"></div>
     </div>
-
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const tg = window.Telegram.WebApp;
-            const getBody = function() {
-                return (document.body || document.head || document.documentElement || document.doctype || document);
-            };
-
-            try { tg.ready(); } catch (e) {
-                getBody().innerHTML = '<div style="color:#ff5555;background:#000;height:100vh;display:flex;align-items:center;justify-content:center;font-size:1.3rem">Acesse apenas pelo Telegram</div>';
-                return;
-            }
-
-            try { tg.expand(); tg.requestFullscreen(); } catch (e) {}
+            try { tg.ready(); tg.expand(); tg.requestFullscreen(); } catch (e) {}
 
             const params = new URLSearchParams(window.location.search);
-            const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série Teste';
-            const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : 'http://127.0.0.1:8080';
+            const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série';
+            const serverBase = params.get('server') ? decodeURIComponent(params.get('server')) : '';
             const epsComprimidos = params.get('eps');
-            
             const chatIdSerie = params.get('chat_id') || "";
             const accessHashSerie = params.get('access_hash') || "0"; 
 
@@ -230,172 +61,90 @@
 
             window.toggleMenu = function() { epModal.classList.toggle('active'); }
 
-            // ─── FUNÇÃO CRIPTOGRÁFICA (ASSINATURA DE PING) ───
             async function assinarPing(hashUrl, tempoVideo) {
-                const texto = hashUrl + tempoVideo;
-                const buffer = new TextEncoder().encode(texto);
+                const buffer = new TextEncoder().encode(hashUrl + tempoVideo);
                 const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-                const hashArray = Array.from(new Uint8Array(hashBuffer));
-                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
             }
 
-            // ─── LÓGICA DE EXTRAÇÃO E SEGURANÇA ───
             if (epsComprimidos) {
-                const listaEps = epsComprimidos.split(',');
-                listaEps.forEach((epItem, index) => {
+                epsComprimidos.split(',').forEach((epItem, index) => {
                     const partes = epItem.split('_');
                     if(partes.length >= 3) {
-                        const id = partes[0];
-                        const hash = partes[1];
-                        const exp = partes[2]; 
-                        
                         playlist.push({
-                            hashSec: hash, // Guardamos o hash para o ping assinado
-                            // Rota de Troca (Handshake VOUCHER)
-                            authUrl: `${serverBase}/autorizar/${id}?hash=${hash}&chat_id=${chatIdSerie}&access_hash=${accessHashSerie}&exp=${exp}`,
-                            // Rota Base do Vídeo (Precisará do Token)
-                            streamUrlBase: `${serverBase}/stream/${id}?chat_id=${chatIdSerie}&access_hash=${accessHashSerie}`,
+                            hashSec: partes[1],
+                            authUrl: `${serverBase}/autorizar/${partes[0]}?hash=${partes[1]}&chat_id=${chatIdSerie}&access_hash=${accessHashSerie}&exp=${partes[2]}`,
+                            streamUrlBase: `${serverBase}/stream/${partes[0]}?chat_id=${chatIdSerie}&access_hash=${accessHashSerie}`,
                             titulo: `${tituloSerie} - Ep ${index + 1}`
                         });
                     }
                 });
             }
 
-            // ─── CONSTRUÇÃO DA TELA ───
             playlist.forEach((item, index) => {
                 const btn = document.createElement('button');
-                btn.className = 'ep-btn';
-                btn.innerText = `${index + 1}`; 
-                btn.addEventListener('click', () => {
-                    epModal.classList.remove('active');
-                    document.getElementById(`card-ep-${index}`).scrollIntoView({ behavior: 'auto' });
-                });
+                btn.className = 'ep-btn'; btn.innerText = `${index + 1}`; 
+                btn.onclick = () => { epModal.classList.remove('active'); document.getElementById(`card-ep-${index}`).scrollIntoView({ behavior: 'auto' }); };
                 epGrid.appendChild(btn);
 
                 const card = document.createElement('div');
-                card.className = 'video-card';
-                card.id = `card-ep-${index}`; 
-                card.setAttribute('data-index', index); 
-
-                // O vídeo nasce "vazio" (sem src). A url será gerada via Handshake
-                card.innerHTML = `
-                    <video-player>
-                        <video-skin>
-                            <video playsinline preload="none"></video>
-                            <media-controls>
-                                <button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button>
-                                <div class="info-overlay">
-                                    <div class="info-title">${item.titulo}</div>
-                                </div>
-                            </media-controls>
-                        </video-skin>
-                    </video-player>
-                `;
+                card.className = 'video-card'; card.id = `card-ep-${index}`; card.setAttribute('data-index', index); 
+                card.innerHTML = `<video-player><video-skin><video playsinline preload="none"></video><media-controls><button class="episodes-toggle" onclick="toggleMenu()">☰ Episódios</button><div class="info-overlay"><div class="info-title">${item.titulo}</div></div></media-controls></video-skin></video-player>`;
                 feedContainer.appendChild(card);
 
                 const videoObj = card.querySelector('video');
-
-                // EVENTOS DO HEARTBEAT ASSINADO E AUTO-SCROLL
                 videoObj.addEventListener('play', () => {
                     clearInterval(videoObj.heartbeatInterval); 
                     videoObj.heartbeatInterval = setInterval(async () => {
                         if (videoObj.paused || videoObj.readyState === 0) return;
-                        
-                        const tempoAtual = Math.floor(videoObj.currentTime);
-                        const tokenDinamico = await assinarPing(item.hashSec, tempoAtual);
-                        
-                        const pingUrl = `${serverBase}/ping?hash=${item.hashSec}&time=${tempoAtual}&token=${tokenDinamico}`;
-                        fetch(pingUrl, { method: 'GET', mode: 'no-cors' }).catch(()=> {});
+                        const tempo = Math.floor(videoObj.currentTime);
+                        const token = await assinarPing(item.hashSec, tempo);
+                        fetch(`${serverBase}/ping?hash=${item.hashSec}&time=${tempo}&token=${token}`, { method: 'GET', mode: 'no-cors' }).catch(()=>{});
                     }, 10000); 
                 });
-
                 videoObj.addEventListener('pause', () => clearInterval(videoObj.heartbeatInterval));
                 videoObj.addEventListener('ended', () => {
                     clearInterval(videoObj.heartbeatInterval);
-                    const proximoIndex = index + 1;
-                    if (proximoIndex < playlist.length) {
-                        const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
-                        if (proximoCard) proximoCard.scrollIntoView({ behavior: 'smooth' });
-                    }
+                    const proximoCard = document.getElementById(`card-ep-${index + 1}`);
+                    if (proximoCard) proximoCard.scrollIntoView({ behavior: 'smooth' });
                 });
             });
 
-            // ─── FUNÇÃO DE CARREGAMENTO SEGURO (HANDSHAKE) ───
             async function carregarVideoComSeguranca(videoElement, itemData) {
-                // Só carrega se não tiver src configurado ainda
                 if (!videoElement.getAttribute('src')) {
                     try {
                         const res = await fetch(itemData.authUrl);
-                        if (!res.ok) throw new Error("Acesso Bloqueado pelo Servidor");
-                        
-                        // Pegamos o Token amarrado ao IP
+                        if (!res.ok) return;
                         const tokenDeIP = await res.text();
-                        
-                        // Montamos o link real e injetamos no player
                         videoElement.setAttribute('src', `${itemData.streamUrlBase}&token=${tokenDeIP}`);
                         videoElement.load();
-                    } catch (error) {
-                        console.error("Falha de Handshake:", error);
-                    }
+                    } catch (e) {}
                 }
             }
 
-            // ─── CÉREBRO OTIMIZADO (OBSERVER) ───
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     const cardIndex = parseInt(entry.target.getAttribute('data-index'));
                     const video = entry.target.querySelector('video');
-                    const itemData = playlist[cardIndex];
                     if (!video) return;
 
                     if (entry.isIntersecting) {
                         video.loadTimer = setTimeout(async () => {
-                            
-                            // Autentica e carrega o vídeo atual (se não foi carregado)
-                            await carregarVideoComSeguranca(video, itemData);
-
+                            await carregarVideoComSeguranca(video, playlist[cardIndex]);
                             video.muted = true;
-                            video.play().then(() => {
-                                video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000);
-                            }).catch(() => { console.log("Autoplay bloqueado pelo navegador."); });
-
-                            // Tenta carregar o próximo vídeo (Handshake pré-buffer)
-                            const proximoIndex = cardIndex + 1;
-                            if (proximoIndex < playlist.length) {
-                                const proximoCard = document.getElementById(`card-ep-${proximoIndex}`);
-                                if (proximoCard) {
-                                    const proximoVideo = proximoCard.querySelector('video');
-                                    carregarVideoComSeguranca(proximoVideo, playlist[proximoIndex]);
-                                }
-                            }
-                        }, 400); // 400ms delay para evitar requests se o usuário rolar rápido demais
+                            video.play().then(() => { video.unmuteTimeout = setTimeout(() => { video.muted = false; }, 1000); }).catch(() => {});
+                            const proximoCard = document.getElementById(`card-ep-${cardIndex + 1}`);
+                            if (proximoCard) carregarVideoComSeguranca(proximoCard.querySelector('video'), playlist[cardIndex + 1]);
+                        }, 400);
                     } else {
-                        clearTimeout(video.loadTimer);
-                        clearTimeout(video.unmuteTimeout);
-                        video.pause();
-                        video.muted = true;
-
-                        // Libera a memória de vídeos distantes
-                        if (Math.abs(cardIndex - getIndexVisivelAtual()) > 2) {
-                            if (video.getAttribute('src')) { 
-                                video.removeAttribute('src'); 
-                                video.load(); 
-                            }
+                        clearTimeout(video.loadTimer); clearTimeout(video.unmuteTimeout);
+                        video.pause(); video.muted = true;
+                        if (Math.abs(cardIndex - (function(){ let v=0; document.querySelectorAll('.video-card').forEach(c=>{ const r=c.getBoundingClientRect(); if(r.top>=-100 && r.top<=window.innerHeight/2) v=parseInt(c.getAttribute('data-index')); }); return v; })()) > 2) {
+                            if (video.getAttribute('src')) { video.removeAttribute('src'); video.load(); }
                         }
                     }
                 });
             }, { root: feedContainer, threshold: 0.6 });
-
-            function getIndexVisivelAtual() {
-                let visivel = 0;
-                document.querySelectorAll('.video-card').forEach(card => {
-                    const rect = card.getBoundingClientRect();
-                    if (rect.top >= -100 && rect.top <= window.innerHeight / 2) {
-                        visivel = parseInt(card.getAttribute('data-index'));
-                    }
-                });
-                return visivel;
-            }
 
             document.querySelectorAll('.video-card').forEach(card => observer.observe(card));
         });
