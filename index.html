@@ -14,28 +14,59 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        /* ─── CORREÇÃO WEBVIEW PARA NÃO COLAPSAR A TELA ─── */
+        /* ─── CORREÇÃO DEFINITIVA PARA TELA CHEIA MOBILE ─── */
         html, body { 
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; 
             height: 100%; 
-            height: -webkit-fill-available;
             background-color: #000; 
             color: #fff; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             overflow: hidden; 
         }
         
-        .app-shell { position: relative; width: 100%; max-width: 480px; height: 100%; margin: 0 auto; background: #000; overflow: hidden; }
+        .app-shell { 
+            position: absolute; 
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; 
+            max-width: 480px; 
+            margin: 0 auto; 
+            background: #000; 
+            overflow: hidden; 
+        }
         @media (min-width: 481px) { .app-shell { box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 0 90px rgba(0,0,0,0.9); } }
         
-        .feed-container { height: 100%; width: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        /* O Flexbox obriga os itens filhos a respeitarem a altura da tela */
+        .feed-container { 
+            display: flex;
+            flex-direction: column;
+            height: 100%; 
+            width: 100%; 
+            overflow-y: auto; 
+            scroll-snap-type: y mandatory; 
+            scroll-behavior: smooth; 
+            -webkit-overflow-scrolling: touch; 
+            scrollbar-width: none; 
+        }
         .feed-container::-webkit-scrollbar { display: none; }
         
-        .video-card { height: 100%; width: 100%; scroll-snap-align: start; position: relative; background-color: #000; overflow: hidden; }
+        /* ─── O CADEADO DE ALTURA (Impede a Sanfona) ─── */
+        .video-card { 
+            flex: 0 0 100%; /* Cada cartão ocupa EXATAMENTE 100% da tela visível */
+            height: 100%; 
+            width: 100%; 
+            scroll-snap-align: start; 
+            scroll-snap-stop: always;
+            position: relative; 
+            background-color: #000; 
+            overflow: hidden; 
+        }
         
-        /* ─── DESIGN PREMIUM DO VIDEO.JS (CORRIGIDO) ─── */
+        /* ─── VIDEO.JS FORÇADO A ESTICAR ─── */
         video-player { 
-            /* Trocamos display:contents por block + 100% para nunca bugar no iPhone/Android */
-            display: block; 
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; 
             height: 100%;
             --media-border-radius: 0px !important;
@@ -43,7 +74,8 @@
         }
         
         video-skin { 
-            display: block; 
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; 
             height: 100%; 
             --media-object-fit: cover; 
@@ -62,7 +94,7 @@
         media-controls { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.25s; }
         media-controls:not([data-visible]) { opacity: 0; }
 
-        /* ─── TÍTULOS E BOTÕES DENTRO DO PLAYER (Somem com inatividade) ─── */
+        /* ─── TÍTULOS E BOTÕES DENTRO DO PLAYER ─── */
         .info-overlay {
             position: absolute;
             bottom: 0; left: 0;
@@ -71,6 +103,7 @@
             padding-bottom: 90px; /* Acima da barra de progresso */
             background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
             pointer-events: none;
+            z-index: 10;
         }
         
         .info-title {
@@ -98,7 +131,7 @@
             backdrop-filter: blur(10px);
             pointer-events: auto; 
             transition: 0.2s;
-            z-index: 100;
+            z-index: 11;
         }
         .episodes-toggle:hover { background: rgba(255, 255, 255, 0.2); }
 
@@ -128,7 +161,12 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const tg = window.Telegram.WebApp;
-            try { tg.ready(); tg.expand(); tg.requestFullscreen(); } catch (e) {}
+            try { 
+                tg.ready(); 
+                tg.expand(); 
+                tg.requestFullscreen(); 
+                tg.disableVerticalSwipes(); // Trava gestos nativos do Telegram que atrapalham o scroll
+            } catch (e) {}
 
             const params = new URLSearchParams(window.location.search);
             const tituloSerie = params.get('titulo') ? decodeURIComponent(params.get('titulo')) : 'Série';
@@ -173,7 +211,6 @@
                 const card = document.createElement('div');
                 card.className = 'video-card'; card.id = `card-ep-${index}`; card.setAttribute('data-index', index); 
                 
-                // ─── MARCAÇÃO DO VIDEO.JS RESTAURADA ───
                 card.innerHTML = `
                     <video-player>
                         <video-skin>
@@ -191,7 +228,6 @@
 
                 const videoObj = card.querySelector('video');
                 
-                // ─── HEARTBEAT ANTI-PIRATARIA ───
                 videoObj.addEventListener('play', () => {
                     clearInterval(videoObj.heartbeatInterval); 
                     videoObj.heartbeatInterval = setInterval(async () => {
@@ -235,33 +271,29 @@
             let activeIndex = 0;
 
             function sincronizarFilaDeVideos(indexAtual) {
-                // 1. Pausa todos os vídeos que não são o atual
                 document.querySelectorAll('video').forEach((v, i) => {
                     if (i !== indexAtual) v.pause();
                 });
 
-                // 2. Limpa vídeos distantes (RAM e Rede limpas!)
                 document.querySelectorAll('.video-card').forEach((card, i) => {
                     const v = card.querySelector('video');
                     if (i < indexAtual - 1 || i > indexAtual + 1) {
                         if (v.getAttribute('src')) {
                             v.removeAttribute('src');
                             v.load();
-                            v.isFetchingAuth = false; // Destranca para carregar no futuro
+                            v.isFetchingAuth = false; 
                         }
                     }
                 });
 
-                // 3. Carrega e Toca o vídeo ATUAL
                 const activeCard = document.getElementById(`card-ep-${indexAtual}`);
                 if (activeCard) {
                     const activeVideo = activeCard.querySelector('video');
                     carregarVideoUnico(activeVideo, playlist[indexAtual]).then(() => {
-                        activeVideo.play().catch(()=>{}); // Toca se o navegador permitir autoplay
+                        activeVideo.play().catch(()=>{}); 
                     });
                 }
 
-                // 4. Carrega silenciosamente o PRÓXIMO vídeo (Preload)
                 const nextCard = document.getElementById(`card-ep-${indexAtual + 1}`);
                 if (nextCard) {
                     const nextVideo = nextCard.querySelector('video');
@@ -273,10 +305,8 @@
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
                         activeIndex = parseInt(entry.target.getAttribute('data-index'));
-                        
                         clearTimeout(debounceTimer);
                         
-                        // Executa o Maestro se ele parar a tela por 300ms no mesmo vídeo
                         debounceTimer = setTimeout(() => {
                             sincronizarFilaDeVideos(activeIndex);
                         }, 300);
