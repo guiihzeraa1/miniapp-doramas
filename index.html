@@ -293,7 +293,19 @@
                 if (activeCard) {
                     const activeVideo = activeCard.querySelector('video');
                     carregarVideoUnico(activeVideo, playlist[indexAtual]).then(() => {
-                        activeVideo.play().catch(()=>{}); 
+                        
+                        // 🔥 O TRUQUE DE GÊNIO VOLTOU AQUI:
+                        activeVideo.muted = true; // Engana o navegador
+                        
+                        const playPromise = activeVideo.play();
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                // Devolve o som suavemente quase 1 segundo depois
+                                setTimeout(() => { activeVideo.muted = false; }, 800);
+                            }).catch(err => {
+                                console.log("O celular bloqueou mesmo no mudo.");
+                            });
+                        }
                     });
                 }
 
