@@ -367,7 +367,7 @@
     <!--     SCRIPTS DE SEGURANÇA (ANTI-INSPECIONAR / ANTI-PC)   -->
     <!-- ═══════════════════════════════════════════════════════ -->
     
-    <!-- 1. BLOQUEIO DE DEVTOOLS (INSPECIONAR ELEMENTO) -->
+    <!-- 1. BLOQUEIO DE DEVTOOLS E CONSOLE (INSPECIONAR ELEMENTO) -->
     <script>
     try {
         document.onkeydown = function(e) {
@@ -512,11 +512,13 @@
     }
     </script>
 
-    <!-- 2. BLOQUEIO DE REDIMENSIONAMENTO FORÇADO E TECLAS (COMPUTADOR EXTERNO) -->
+    <!-- 2. BLOQUEIO DE REDIMENSIONAMENTO FORÇADO (COMPUTADOR EXTERNO - CORREÇÃO iPHONE) -->
     <script>
-    if (true) {
+    const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (!isMobile) {
         setInterval(() => {
-            if ((window.outerWidth - window.innerWidth) > 100 || (window.outerHeight - window.innerHeight) > 100) {
+            if ((window.outerWidth - window.innerWidth) > 160 || (window.outerHeight - window.innerHeight) > 160) {
                 document.body.innerHTML = '<div style="color:#ff5555;background:#000;height:100vh;display:flex;align-items:center;justify-content:center;font-size:1.3rem">Acesse apenas pelo Telegram (101)</div>';
             }
             const t = performance.now(); debugger; 
@@ -525,6 +527,7 @@
             }
         }, 1200);
     }
+
     document.oncontextmenu = e => e.preventDefault();
     document.onkeydown = e => {
         if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && 'IJC'.includes(e.key)) || (e.ctrlKey && e.key === 'u')) {
