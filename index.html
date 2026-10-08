@@ -440,20 +440,34 @@
             async function carregarVideoUnico(videoEl, playlistItem) {
                 if (!videoEl || !playlistItem) return;
                 if (videoEl.getAttribute('src')) return;
-
+            
                 try {
                     if (!playlistItem.tokenRecebido) {
                         const resposta = await fetch(playlistItem.authUrl);
+            
                         if (!resposta.ok) {
-                            console.error("Servidor recusou o acesso", resposta.status);
+                            console.error(
+                                "Servidor recusou o acesso",
+                                resposta.status
+                            );
                             return;
                         }
-                        playlistItem.tokenRecebido = await resposta.text();
+            
+                        playlistItem.tokenRecebido =
+                            (await resposta.text()).trim();
                     }
-                    videoEl.setAttribute('src', `${playlistItem.streamUrlBase}&token=${playlistItem.tokenRecebido}`);
+            
+                    const streamUrl =
+                        `${playlistItem.streamUrlBase}&token=${encodeURIComponent(playlistItem.tokenRecebido)}`;
+            
+                    videoEl.setAttribute('src', streamUrl);
                     videoEl.load();
+            
                 } catch (e) {
-                    console.log("Falha ao se conectar com o servidor.", e);
+                    console.log(
+                        "Falha ao se conectar com o servidor.",
+                        e
+                    );
                 }
             }
 
